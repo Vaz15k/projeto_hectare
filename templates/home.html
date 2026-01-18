@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerenciador Oficina</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">🚜 Teste</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card shadow">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">Ordens de Serviço Recentes</h4>
+            </div>
+            <div class="card-body">
+                
+                {% if lista_servicos %}
+                
+                    <table class="table table-hover table-striped">
+                        <thead>
+                            <tr>
+                                <th>OS #</th>
+                                <th>Cliente</th>
+                                <th>Máquina / Descrição</th>
+                                <th>Data</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for servico in lista_servicos %}
+                            <tr>
+                                <td>{{ servico.id }}</td>
+                                <td>{{ servico.cliente.nome }}</td>
+                                <td>{{ servico.descricao }}</td>
+                                <td>{{ servico.data_entrada|date:"d/m/Y" }}</td>
+                                <td>
+                                    {% if servico.status == 'CONCLUIDO' %}
+                                        <span class="badge bg-success">{{ servico.get_status_display }}</span>
+                                    {% elif servico.status == 'CANCELADO' %}
+                                        <span class="badge bg-danger">{{ servico.get_status_display }}</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">{{ servico.get_status_display }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                {% else %}
+                    <div class="alert alert-info text-center">
+                        Nenhum serviço cadastrado no sistema.
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
