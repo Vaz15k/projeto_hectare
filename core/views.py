@@ -1,3 +1,11 @@
 from django.shortcuts import render
+from .models import Servico
 
-# Create your views here.
+def home(request):
+    servicos = Servico.objects.all().order_by('-data_inicio')
+
+    context = {
+        'lista_servicos': servicos,
+    }
+
+    return render(request, 'home.html', context)
