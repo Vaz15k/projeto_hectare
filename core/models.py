@@ -3,6 +3,15 @@ from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
 
 # Create your models here.
+
+class Empregado(models.Model):
+    nome = models.CharField(max_length=100)
+    cpf = models.CharField(max_length=14, unique=True)
+    cargo = models.CharField(max_length=100)
+
+    def __str__(self):
+        return (f"{self.nome} - {self.cargo}")
+
 class Cliente(models.Model):
     nome = models.CharField(max_length=100)
 
@@ -35,7 +44,7 @@ class Servico(models.Model):
         ('CANCELADO', 'Cancelado'),
     ]
 
-    tecnico = models.ForeignKey(User, on_delete=models.PROTECT, related_name='servico_realizado')
+    tecnico = models.ForeignKey(Empregado, on_delete=models.PROTECT, related_name='servicos_tecnico')
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='servicos')
     tipo_servico = models.ForeignKey(TipoServico, on_delete=models.PROTECT, related_name='servicos_tipo')
