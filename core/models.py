@@ -51,7 +51,8 @@ class Servico(models.Model):
     descricao = models.TextField(blank=True, null=True)
     pecas_utilizadas = models.TextField(blank=True, null=True, verbose_name="Peças Utilizadas(Registro)")
 
-    data_inicio = models.DateTimeField(auto_now_add=True)
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_inicio = models.DateTimeField(blank=True, null=True)
     data_conclusao = models.DateTimeField(blank=True, null=True)
     data_competencia = models.DateTimeField(blank=True, null=True)
 
