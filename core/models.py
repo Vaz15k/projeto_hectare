@@ -35,6 +35,19 @@ class TipoServico(models.Model):
     def __str__(self):
         return self.nome
 
+
+def calcular_data_competencia(data_inicio):
+    """
+    Calcula a data de competência como o primeiro dia do mês de `data_inicio`.
+    Se `data_inicio` for None, retorna o primeiro dia do mês atual.
+    """
+    from datetime import datetime
+    if data_inicio is None:
+        return datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if isinstance(data_inicio, datetime):
+        return data_inicio.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return datetime(data_inicio.year, data_inicio.month, 1)
+
 class Servico(models.Model):
     STATUS_POS = [
         ('ORCAMENTO', 'Orçamento'), # REVISAR SE PRECISAR SALVAR O ORÇAMENTO
@@ -69,6 +82,12 @@ class Servico(models.Model):
 
     def __str__(self):
         return f"{self.tipo_servico.nome} - {self.cliente.nome}"
+
+    def save(self, *args, **kwargs):
+        if self.data_inicio and not self.data_competencia:
+            self.data_competencia = calcular_data_competencia(self.data_inicio)
+        super().save(*args, **kwargs)
+
 
 def renomear_anexo(instance, filename):
     import uuid
