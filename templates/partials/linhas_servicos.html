@@ -1,0 +1,39 @@
+{% for servico in itens %}
+<tr>
+    <td class="px-4 py-3 text-muted">#{{ servico.pk }}</td>
+    <td class="px-4 py-3 fw-bold">{{ servico.tipo_servico.nome }}</td>
+    <td class="px-4 py-3">{{ servico.cliente.nome }}</td>
+    <td class="px-4 py-3 small">{{ servico.tecnico.nome }}</td>
+    <td class="px-4 py-3">
+        {% if servico.status == 'CONCLUIDO' %}
+            <span class="badge bg-success">Concluído</span>
+        {% elif servico.status == 'EM_ANDAMENTO' %}
+            <span class="badge bg-primary">Em Andamento</span>
+        {% elif servico.status == 'CANCELADO' %}
+            <span class="badge bg-danger">Cancelado</span>
+        {% elif servico.status == 'AGENDADO' %}
+            <span class="badge bg-info text-dark">Agendado</span>
+        {% else %}
+            <span class="badge bg-secondary">Orçamento</span>
+        {% endif %}
+    </td>
+    <td class="px-4 py-3 small">{{ servico.data_inicio|date:"d/m/Y H:i"|default:"-" }}</td>
+    <td class="px-4 py-3 font-monospace">
+        {% if servico.valor_total %}
+            R$ {{ servico.valor_total }}
+        {% else %}
+            -
+        {% endif %}
+    </td>
+    <td class="px-4 py-3 text-end">
+        <div class="btn-group">
+            <a href="{% url 'editar_servico' servico.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'deletar_servico' servico.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir">
+                <i class="bi bi-trash"></i>
+            </a>
+        </div>
+    </td>
+</tr>
+{% endfor %}

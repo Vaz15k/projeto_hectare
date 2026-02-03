@@ -1,0 +1,11 @@
+{% for tipo in itens %}
+<tr>
+    <td class="px-4 py-3 fw-bold">{{ tipo.nome }}</td>
+    <td class="px-4 py-3 text-muted">{{ tipo.descricao|default:"-"|truncatechars:50 }}</td>
+    <td class="px-4 py-3 text-end">
+        <a href="{% url 'editar_tipo_servico' tipo.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar">
+            <i class="bi bi-pencil"></i>
+        </a>
+    </td>
+</tr>
+{% endfor %}

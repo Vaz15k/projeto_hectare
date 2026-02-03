@@ -1,0 +1,12 @@
+{% for empregado in itens %}
+<tr>
+    <td class="px-4 py-3 fw-bold">{{ empregado.nome }}</td>
+    <td class="px-4 py-3 font-monospace">{{ empregado.cpf }}</td>
+    <td class="px-4 py-3"><span class="badge bg-secondary">{{ empregado.cargo }}</span></td>
+    <td class="px-4 py-3 text-end">
+        <a href="{% url 'editar_empregado' empregado.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar">
+            <i class="bi bi-pencil"></i>
+        </a>
+    </td>
+</tr>
+{% endfor %}
