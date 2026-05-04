@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Servico, Cliente, Empregado, TipoServico
-from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm
+from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet
 
 
 def home(request):
@@ -161,16 +161,24 @@ def listar_servicos(request):
 def criar_servico(request):
     if request.method == "POST":
         form = ServicoForm(request.POST)
+        formset = GastoExtraFormSet(request.POST)
         if form.is_valid():
-            form.save()
+            servico = form.save()
+            formset = GastoExtraFormSet(request.POST, instance=servico)
+            if formset.is_valid():
+                formset.save()
+                servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in servico.gastos_extras.all())
+                servico.save(update_fields=["valor_total"])
             return redirect("home")
     else:
         form = ServicoForm()
+        formset = GastoExtraFormSet()
     return render(
         request,
         "formulario_generico.html",
         {
             "form": form,
+            "formset": formset,
             "titulo": "Novo Serviço",
             "rota_cancelar": "listar_servicos",
             "url_voltar": "listar_servicos",
@@ -183,17 +191,23 @@ def editar_servico(request, pk):
     servico = get_object_or_404(Servico, pk=pk)
     if request.method == "POST":
         form = ServicoForm(request.POST, instance=servico)
-        if form.is_valid():
+        formset = GastoExtraFormSet(request.POST, instance=servico)
+        if form.is_valid() and formset.is_valid():
             form.save()
+            formset.save()
+            servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in servico.gastos_extras.all())
+            servico.save(update_fields=["valor_total"])
             return redirect("listar_servicos")
     else:
         form = ServicoForm(instance=servico)
+        formset = GastoExtraFormSet(instance=servico)
 
     return render(
         request,
         "formulario_generico.html",
         {
             "form": form,
+            "formset": formset,
             "titulo": f"Editar Serviço #{servico.pk}",
             "rota_cancelar": "listar_servicos",
             "url_voltar": "listar_servicos",

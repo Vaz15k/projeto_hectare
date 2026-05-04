@@ -1,5 +1,6 @@
 from django import forms
-from .models import Servico, Cliente, Empregado, TipoServico
+from django.forms import inlineformset_factory
+from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra
 
 
 class TipoServicoForm(forms.ModelForm):
@@ -45,8 +46,6 @@ class ServicoForm(forms.ModelForm):
             "valor_km",
             "hora_trabalhada",
             "valor_hora",
-            "valor_servico",
-            "valor_total",
             "status",
         ]
         widgets = {
@@ -69,10 +68,24 @@ class ServicoForm(forms.ModelForm):
             "valor_km": forms.NumberInput(attrs={"class": "form-control"}),
             "hora_trabalhada": forms.NumberInput(attrs={"class": "form-control"}),
             "valor_hora": forms.NumberInput(attrs={"class": "form-control"}),
-            "valor_servico": forms.NumberInput(attrs={"class": "form-control"}),
-            "valor_total": forms.NumberInput(attrs={"class": "form-control"}),
             "status": forms.Select(attrs={"class": "form-control"}),
         }
+
+
+class GastoExtraForm(forms.ModelForm):
+    class Meta:
+        model = GastoExtra
+        fields = ["descricao", "valor"]
+        widgets = {
+            "descricao": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: Peça, ferramenta..."}),
+            "valor": forms.NumberInput(attrs={"class": "form-control gasto-valor", "placeholder": "0.00"}),
+        }
+
+
+GastoExtraFormSet = inlineformset_factory(
+    Servico, GastoExtra, form=GastoExtraForm,
+    extra=1, can_delete=True,
+)
 
 
 class ClienteForm(forms.ModelForm):

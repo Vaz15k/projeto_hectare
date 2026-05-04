@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
@@ -75,17 +76,25 @@ class Servico(models.Model):
     hora_trabalhada = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     valor_hora = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    valor_servico = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    valor_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    valor_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, editable=False)
 
     status = models.CharField(max_length=20, choices=STATUS_POS, default='ORCAMENTO')
 
     def __str__(self):
         return f"{self.tipo_servico.nome} - {self.cliente.nome}"
 
+    def calcular_valor_total(self):
+        total = Decimal('0.00')
+        if self.km_rodado and self.valor_km:
+            total += self.km_rodado * self.valor_km
+        if self.hora_trabalhada and self.valor_hora:
+            total += self.hora_trabalhada * self.valor_hora
+        return total
+
     def save(self, *args, **kwargs):
         if self.data_inicio and not self.data_competencia:
             self.data_competencia = calcular_data_competencia(self.data_inicio)
+        self.valor_total = self.calcular_valor_total()
         super().save(*args, **kwargs)
 
 
@@ -116,6 +125,15 @@ class AnexoServico(models.Model):
     def is_video(self):
         name = self.arquivo.name.lower()
         return name.endswith(('.mp4', '.mov', '.avi'))
+
+
+class GastoExtra(models.Model):
+    servico = models.ForeignKey(Servico, on_delete=models.CASCADE, related_name='gastos_extras')
+    descricao = models.CharField(max_length=200, verbose_name="Descrição do gasto")
+    valor = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor (R$)")
+
+    def __str__(self):
+        return f"{self.descricao}: R$ {self.valor}"
 
 
 class NotaFiscal(models.Model):
