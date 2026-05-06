@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8 col-xl-6" style="{{ container_style|default:'' }}">
+            <div class="card shadow border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h4 class="mb-0 text-primary">{{ titulo }}</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% include "partials/form_field.html" with field=form.tecnico %}
+                        {% include "partials/form_field.html" with field=form.cliente %}
+                        {% include "partials/form_field.html" with field=form.tipo_servico %}
+                        {% include "partials/form_field.html" with field=form.descricao %}
+                        {% include "partials/form_field.html" with field=form.pecas_utilizadas %}
+
+                        <div class="row g-3">
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.data_inicio %}</div>
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.data_conclusao %}</div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.km_rodado %}</div>
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.valor_km %}</div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.hora_trabalhada %}</div>
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.valor_hora %}</div>
+                        </div>
+
+                        {% include "partials/form_field.html" with field=form.status %}
+
+                        {% if formset %}
+                        <hr class="my-4">
+                        <h5 class="text-primary mb-3"><i class="bi bi-cash-stack"></i> Gastos Extras</h5>
+                        <p class="text-muted small">Registre peças, ferramentas ou outros gastos adicionais.</p>
+                        <div id="gastos-extras-formset">
+                            {{ formset.management_form }}
+                            {% for gasto_form in formset %}
+                            <div class="gasto-extra-row row g-2 mb-2 align-items-end">
+                                <div class="col-md-6">
+                                    <label class="form-label small text-secondary">Descrição</label>
+                                    {{ gasto_form.descricao }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small text-secondary">Valor (R$)</label>
+                                    {{ gasto_form.valor }}
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end pb-1">
+                                    {% if gasto_form.instance.pk %}
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-gasto" title="Remover">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                {% if gasto_form.DELETE %}
+                                <div class="d-none">{{ gasto_form.DELETE }}</div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" id="add-gasto-btn" class="btn btn-outline-primary btn-sm mt-1">
+                            <i class="bi bi-plus-circle"></i> Adicionar gasto
+                        </button>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold">Valor Total Estimado:</span>
+                                <span id="preview-valor-total" class="fs-5 font-monospace fw-bold text-success">R$ 0.00</span>
+                            </div>
+                            <div class="small text-muted mt-1" id="preview-detalhes"></div>
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                            <a href="{% url rota_cancelar|default:'home' %}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-check-lg"></i> {{ submit_label|default:'Salvar' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if formset %}
+<script>
+(function() {
+    const totalPrefix = '{{ formset.prefix }}-';
+    const formsetDiv = document.getElementById('gastos-extras-formset');
+    const addBtn = document.getElementById('add-gasto-btn');
+    const totalForms = document.querySelector('[name$="-TOTAL_FORMS"]');
+
+    function recalcularTotal() {
+        const km = parseFloat(document.querySelector('[name$="km_rodado"]')?.value) || 0;
+        const valKm = parseFloat(document.querySelector('[name$="valor_km"]')?.value) || 0;
+        const horas = parseFloat(document.querySelector('[name$="hora_trabalhada"]')?.value) || 0;
+        const valHora = parseFloat(document.querySelector('[name$="valor_hora"]')?.value) || 0;
+        const subKm = km * valKm;
+        const subHora = horas * valHora;
+
+        let gastos = 0;
+        document.querySelectorAll('.gasto-valor').forEach(function(el) {
+            gastos += parseFloat(el.value) || 0;
+        });
+
+        const total = subKm + subHora + gastos;
+        document.getElementById('preview-valor-total').textContent = 'R$ ' + total.toFixed(2);
+
+        const detalhes = [];
+        if (subKm > 0) detalhes.push('km: R$ ' + subKm.toFixed(2));
+        if (subHora > 0) detalhes.push('hora: R$ ' + subHora.toFixed(2));
+        if (gastos > 0) detalhes.push('extras: R$ ' + gastos.toFixed(2));
+        document.getElementById('preview-detalhes').textContent = detalhes.join(' | ');
+    }
+
+    function getNewIndex() {
+        return parseInt(totalForms.value) - 1;
+    }
+
+    function createEmptyRow() {
+        const idx = getNewIndex();
+        const row = document.createElement('div');
+        row.className = 'gasto-extra-row row g-2 mb-2 align-items-end';
+        row.innerHTML =
+            '<div class="col-md-6">' +
+                '<label class="form-label small text-secondary">Descrição</label>' +
+                '<input type="text" name="' + totalPrefix + idx + '-descricao" id="id_' + totalPrefix + idx + '-descricao" class="form-control" placeholder="Ex: Peça, ferramenta..." maxlength="200">' +
+            '</div>' +
+            '<div class="col-md-4">' +
+                '<label class="form-label small text-secondary">Valor (R$)</label>' +
+                '<input type="number" name="' + totalPrefix + idx + '-valor" id="id_' + totalPrefix + idx + '-valor" class="form-control gasto-valor" placeholder="0.00" step="0.01">' +
+            '</div>' +
+            '<div class="col-md-2 d-flex align-items-end pb-1">' +
+                '<button type="button" class="btn btn-outline-danger btn-sm remove-gasto" title="Remover"><i class="bi bi-trash"></i></button>' +
+            '</div>';
+        return row;
+    }
+
+    function attachInputListeners() {
+        document.querySelectorAll('.gasto-valor, [name$="km_rodado"], [name$="valor_km"], [name$="hora_trabalhada"], [name$="valor_hora"]').forEach(function(el) {
+            el.removeEventListener('input', recalcularTotal);
+            el.addEventListener('input', recalcularTotal);
+        });
+    }
+
+    addBtn.addEventListener('click', function() {
+        const row = createEmptyRow();
+        formsetDiv.appendChild(row);
+        totalForms.value = parseInt(totalForms.value) + 1;
+        attachInputListeners();
+        recalcularTotal();
+    });
+
+    formsetDiv.addEventListener('click', function(e) {
+        const btn = e.target.closest('.remove-gasto');
+        if (!btn) return;
+        const row = btn.closest('.gasto-extra-row');
+        const deleteInput = row.querySelector('[name$="-DELETE"]');
+        if (deleteInput) {
+            deleteInput.value = 'on';
+            row.style.display = 'none';
+        } else {
+            row.remove();
+            totalForms.value = parseInt(totalForms.value) - 1;
+        }
+        recalcularTotal();
+    });
+
+    attachInputListeners();
+    recalcularTotal();
+})();
+</script>
+{% endif %}
+{% endblock %}

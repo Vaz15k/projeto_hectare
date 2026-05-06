@@ -175,7 +175,7 @@ def criar_servico(request):
         formset = GastoExtraFormSet()
     return render(
         request,
-        "formulario_generico.html",
+        "formulario_servico.html",
         {
             "form": form,
             "formset": formset,
@@ -204,7 +204,7 @@ def editar_servico(request, pk):
 
     return render(
         request,
-        "formulario_generico.html",
+        "formulario_servico.html",
         {
             "form": form,
             "formset": formset,
