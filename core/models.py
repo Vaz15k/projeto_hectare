@@ -94,7 +94,9 @@ class Servico(models.Model):
     def save(self, *args, **kwargs):
         if self.data_inicio and not self.data_competencia:
             self.data_competencia = calcular_data_competencia(self.data_inicio)
-        self.valor_total = self.calcular_valor_total()
+        update_fields = kwargs.get('update_fields')
+        if update_fields is None or 'valor_total' not in update_fields:
+            self.valor_total = self.calcular_valor_total()
         super().save(*args, **kwargs)
 
 
