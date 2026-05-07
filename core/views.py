@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Servico, Cliente, Empregado, TipoServico
+from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra
 from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet
 
 
@@ -167,7 +167,7 @@ def criar_servico(request):
             formset = GastoExtraFormSet(request.POST, instance=servico)
             if formset.is_valid():
                 formset.save()
-                servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in servico.gastos_extras.all())
+                servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
                 servico.save(update_fields=["valor_total"])
             return redirect("home")
     else:
@@ -182,7 +182,6 @@ def criar_servico(request):
             "titulo": "Novo Serviço",
             "rota_cancelar": "listar_servicos",
             "url_voltar": "listar_servicos",
-            "container_style": "max-width: 900px;",
         },
     )
 
@@ -195,7 +194,7 @@ def editar_servico(request, pk):
         if form.is_valid() and formset.is_valid():
             form.save()
             formset.save()
-            servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in servico.gastos_extras.all())
+            servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
             servico.save(update_fields=["valor_total"])
             return redirect("listar_servicos")
     else:
@@ -211,7 +210,6 @@ def editar_servico(request, pk):
             "titulo": f"Editar Serviço #{servico.pk}",
             "rota_cancelar": "listar_servicos",
             "url_voltar": "listar_servicos",
-            "container_style": "max-width: 900px;",
             "submit_label": "Atualizar",
         },
     )

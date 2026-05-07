@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container-fluid p-0">
     <div class="row justify-content-center">
-        <div class="col-12 col-lg-8 col-xl-6" style="{{ container_style|default:'' }}">
+        <div class="col-12 col-lg-8 col-xl-6" style="max-width: 900px;">
             <div class="card shadow border-0">
                 <div class="card-header bg-white py-3 border-bottom">
                     <h4 class="mb-0 text-primary">{{ titulo }}</h4>
@@ -49,22 +49,36 @@
                         <p class="text-muted small">Registre peças, ferramentas ou outros gastos adicionais.</p>
                         <div id="gastos-extras-formset">
                             {{ formset.management_form }}
+                            {% if formset.non_form_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in formset.non_form_errors %}
+                                <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                             {% for gasto_form in formset %}
-                            <div class="gasto-extra-row row g-2 mb-2 align-items-end">
-                                <div class="col-md-6">
-                                    <label class="form-label small text-secondary">Descrição</label>
-                                    {{ gasto_form.descricao }}
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small text-secondary">Valor (R$)</label>
-                                    {{ gasto_form.valor }}
-                                </div>
-                                <div class="col-md-2 d-flex align-items-end pb-1">
-                                    {% if gasto_form.instance.pk %}
-                                    <button type="button" class="btn btn-outline-danger btn-sm remove-gasto" title="Remover">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                    {% endif %}
+                            <div class="gasto-extra-form mb-3 p-3 border rounded position-relative">
+                                {% for hidden in gasto_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                <div class="gasto-extra-row row g-2 align-items-end">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-secondary">Descrição</label>
+                                        {{ gasto_form.descricao }}
+                                        {% if gasto_form.descricao.errors %}
+                                        <div class="invalid-feedback d-block">{{ gasto_form.descricao.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-secondary">Valor (R$)</label>
+                                        {{ gasto_form.valor }}
+                                        {% if gasto_form.valor.errors %}
+                                        <div class="invalid-feedback d-block">{{ gasto_form.valor.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end pb-1">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-gasto" title="Remover">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 {% if gasto_form.DELETE %}
                                 <div class="d-none">{{ gasto_form.DELETE }}</div>
@@ -102,12 +116,32 @@
 
 {% block extra_js %}
 {% if formset %}
+<script type="template/html" id="gasto-extra-template">
+<div class="gasto-extra-form mb-3 p-3 border rounded position-relative">
+    {% for hidden in formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="gasto-extra-row row g-2 align-items-end">
+        <div class="col-md-6">
+            <label class="form-label small text-secondary">Descrição</label>
+            {{ formset.empty_form.descricao }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-secondary">Valor (R$)</label>
+            {{ formset.empty_form.valor }}
+        </div>
+        <div class="col-md-2 d-flex align-items-end pb-1">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-gasto" title="Remover">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    </div>
+</div>
+</script>
 <script>
 (function() {
-    const totalPrefix = '{{ formset.prefix }}-';
     const formsetDiv = document.getElementById('gastos-extras-formset');
     const addBtn = document.getElementById('add-gasto-btn');
     const totalForms = document.querySelector('[name$="-TOTAL_FORMS"]');
+    const templateHtml = document.getElementById('gasto-extra-template').innerHTML;
 
     function recalcularTotal() {
         const km = parseFloat(document.querySelector('[name$="km_rodado"]')?.value) || 0;
@@ -119,6 +153,8 @@
 
         let gastos = 0;
         document.querySelectorAll('.gasto-valor').forEach(function(el) {
+            const form = el.closest('.gasto-extra-form');
+            if (!form || form.style.display === 'none') return;
             gastos += parseFloat(el.value) || 0;
         });
 
@@ -136,23 +172,12 @@
         return parseInt(totalForms.value) - 1;
     }
 
-    function createEmptyRow() {
+    function createEmptyForm() {
         const idx = getNewIndex();
-        const row = document.createElement('div');
-        row.className = 'gasto-extra-row row g-2 mb-2 align-items-end';
-        row.innerHTML =
-            '<div class="col-md-6">' +
-                '<label class="form-label small text-secondary">Descrição</label>' +
-                '<input type="text" name="' + totalPrefix + idx + '-descricao" id="id_' + totalPrefix + idx + '-descricao" class="form-control" placeholder="Ex: Peça, ferramenta..." maxlength="200">' +
-            '</div>' +
-            '<div class="col-md-4">' +
-                '<label class="form-label small text-secondary">Valor (R$)</label>' +
-                '<input type="number" name="' + totalPrefix + idx + '-valor" id="id_' + totalPrefix + idx + '-valor" class="form-control gasto-valor" placeholder="0.00" step="0.01">' +
-            '</div>' +
-            '<div class="col-md-2 d-flex align-items-end pb-1">' +
-                '<button type="button" class="btn btn-outline-danger btn-sm remove-gasto" title="Remover"><i class="bi bi-trash"></i></button>' +
-            '</div>';
-        return row;
+        const html = templateHtml.replace(/__prefix__/g, idx);
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        return div.firstElementChild;
     }
 
     function attachInputListeners() {
@@ -163,8 +188,8 @@
     }
 
     addBtn.addEventListener('click', function() {
-        const row = createEmptyRow();
-        formsetDiv.appendChild(row);
+        const form = createEmptyForm();
+        formsetDiv.appendChild(form);
         totalForms.value = parseInt(totalForms.value) + 1;
         attachInputListeners();
         recalcularTotal();
@@ -173,14 +198,14 @@
     formsetDiv.addEventListener('click', function(e) {
         const btn = e.target.closest('.remove-gasto');
         if (!btn) return;
-        const row = btn.closest('.gasto-extra-row');
-        const deleteInput = row.querySelector('[name$="-DELETE"]');
+        const form = btn.closest('.gasto-extra-form');
+        const deleteInput = form.querySelector('[name$="-DELETE"]');
         if (deleteInput) {
-            deleteInput.value = 'on';
-            row.style.display = 'none';
+            deleteInput.checked = true;
+            form.style.display = 'none';
         } else {
-            row.remove();
             totalForms.value = parseInt(totalForms.value) - 1;
+            form.remove();
         }
         recalcularTotal();
     });
