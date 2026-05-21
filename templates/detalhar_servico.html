@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8" style="max-width: 900px;">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0 text-primary">{{ titulo }}</h4>
+                <div>
+                    <a href="{% url 'editar_servico' servico.pk %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-pencil"></i> Editar
+                    </a>
+                    <a href="{% url 'listar_servicos' %}" class="btn btn-outline-secondary btn-sm ms-1">
+                        <i class="bi bi-arrow-left"></i> Voltar
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Dados do Serviço</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary fw-bold">Tipo de Serviço</label>
+                            <p class="mb-0">{{ servico.tipo_servico.nome }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary fw-bold">Status</label>
+                            <p class="mb-0">
+                                {% if servico.status == 'CONCLUIDO' %}
+                                    <span class="badge bg-success">Concluído</span>
+                                {% elif servico.status == 'EM_ANDAMENTO' %}
+                                    <span class="badge bg-primary">Em Andamento</span>
+                                {% elif servico.status == 'CANCELADO' %}
+                                    <span class="badge bg-danger">Cancelado</span>
+                                {% elif servico.status == 'AGENDADO' %}
+                                    <span class="badge bg-info text-dark">Agendado</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Orçamento</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary fw-bold">Cliente</label>
+                            <p class="mb-0">{{ servico.cliente.nome }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary fw-bold">Técnico</label>
+                            <p class="mb-0">{{ servico.tecnico.nome }} ({{ servico.tecnico.cargo }})</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary fw-bold">Data Início</label>
+                            <p class="mb-0">{{ servico.data_inicio|date:"d/m/Y H:i"|default:"-" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary fw-bold">Data Conclusão</label>
+                            <p class="mb-0">{{ servico.data_conclusao|date:"d/m/Y H:i"|default:"-" }}</p>
+                        </div>
+                        {% if servico.descricao %}
+                        <div class="col-12">
+                            <label class="form-label small text-secondary fw-bold">Descrição do Serviço</label>
+                            <p class="mb-0">{{ servico.descricao|linebreaksbr }}</p>
+                        </div>
+                        {% endif %}
+                        {% if servico.pecas_utilizadas %}
+                        <div class="col-12">
+                            <label class="form-label small text-secondary fw-bold">Peças Utilizadas</label>
+                            <p class="mb-0">{{ servico.pecas_utilizadas|linebreaksbr }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0"><i class="bi bi-calculator"></i> Valores</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        {% if servico.km_rodado or servico.valor_km %}
+                        <div class="col-md-4">
+                            <label class="form-label small text-secondary fw-bold">Km Rodado / Valor Km</label>
+                            <p class="mb-0 font-monospace">{{ servico.km_rodado|default:"0" }} km / R$ {{ servico.valor_km|default:"0.00" }}</p>
+                        </div>
+                        {% endif %}
+                        {% if servico.hora_trabalhada or servico.valor_hora %}
+                        <div class="col-md-4">
+                            <label class="form-label small text-secondary fw-bold">Horas / Valor Hora</label>
+                            <p class="mb-0 font-monospace">{{ servico.hora_trabalhada|default:"0" }}h / R$ {{ servico.valor_hora|default:"0.00" }}</p>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-4">
+                            <label class="form-label small text-secondary fw-bold">Valor Total</label>
+                            <p class="mb-0 font-monospace fs-5 fw-bold text-success">R$ {{ servico.valor_total|default:"0.00" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if gastos %}
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0"><i class="bi bi-cash-stack"></i> Gastos Extras</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead><tr><th>Descrição</th><th class="text-end">Valor</th></tr></thead>
+                            <tbody>
+                                {% for gasto in gastos %}
+                                <tr>
+                                    <td>{{ gasto.descricao }}</td>
+                                    <td class="text-end font-monospace">R$ {{ gasto.valor }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if anexos %}
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0"><i class="bi bi-paperclip"></i> Anexos</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        {% for anexo in anexos %}
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100">
+                                {% if anexo.is_image %}
+                                <a href="{{ anexo.arquivo.url }}" target="_blank">
+                                    <img src="{{ anexo.arquivo.url }}" class="card-img-top" style="height: 180px; object-fit: cover;" alt="Anexo">
+                                </a>
+                                {% elif anexo.is_video %}
+                                <div class="bg-dark d-flex align-items-center justify-content-center" style="height: 180px;">
+                                    <a href="{{ anexo.arquivo.url }}" target="_blank" class="text-white text-decoration-none text-center">
+                                        <i class="bi bi-play-btn-fill display-3"></i>
+                                        <p class="small mb-0 mt-1">Reproduzir vídeo</p>
+                                    </a>
+                                </div>
+                                {% else %}
+                                <div class="bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
+                                    <a href="{{ anexo.arquivo.url }}" target="_blank" class="text-muted text-decoration-none text-center">
+                                        <i class="bi bi-file-earmark display-3"></i>
+                                        <p class="small mb-0 mt-1">Abrir arquivo</p>
+                                    </a>
+                                </div>
+                                {% endif %}
+                                <div class="card-body p-2">
+                                    {% if anexo.descricao %}
+                                    <p class="card-text small mb-1">{{ anexo.descricao }}</p>
+                                    {% endif %}
+                                    <small class="text-muted">{{ anexo.data_upload|date:"d/m/Y H:i" }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

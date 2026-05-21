@@ -27,6 +27,9 @@
     </td>
     <td class="px-4 py-3 text-end">
         <div class="btn-group">
+            <a href="{% url 'detalhar_servico' servico.pk %}" class="btn btn-sm btn-outline-primary" title="Visualizar">
+                <i class="bi bi-eye"></i>
+            </a>
             <a href="{% url 'editar_servico' servico.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar">
                 <i class="bi bi-pencil"></i>
             </a>

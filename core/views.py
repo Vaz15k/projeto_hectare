@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra
-from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet
+from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet, AnexoServicoFormSet
 
 
 def home(request):
@@ -162,23 +162,28 @@ def criar_servico(request):
     if request.method == "POST":
         form = ServicoForm(request.POST)
         formset = GastoExtraFormSet(request.POST)
+        formset_anexos = AnexoServicoFormSet(request.POST, request.FILES)
         if form.is_valid():
             servico = form.save()
             formset = GastoExtraFormSet(request.POST, instance=servico)
-            if formset.is_valid():
+            formset_anexos = AnexoServicoFormSet(request.POST, request.FILES, instance=servico)
+            if formset.is_valid() and formset_anexos.is_valid():
                 formset.save()
+                formset_anexos.save()
                 servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
                 servico.save(update_fields=["valor_total"])
             return redirect("home")
     else:
         form = ServicoForm()
         formset = GastoExtraFormSet()
+        formset_anexos = AnexoServicoFormSet()
     return render(
         request,
         "formulario_servico.html",
         {
             "form": form,
             "formset": formset,
+            "formset_anexos": formset_anexos,
             "titulo": "Novo Serviço",
             "rota_cancelar": "listar_servicos",
             "url_voltar": "listar_servicos",
@@ -191,15 +196,18 @@ def editar_servico(request, pk):
     if request.method == "POST":
         form = ServicoForm(request.POST, instance=servico)
         formset = GastoExtraFormSet(request.POST, instance=servico)
-        if form.is_valid() and formset.is_valid():
+        formset_anexos = AnexoServicoFormSet(request.POST, request.FILES, instance=servico)
+        if form.is_valid() and formset.is_valid() and formset_anexos.is_valid():
             form.save()
             formset.save()
+            formset_anexos.save()
             servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
             servico.save(update_fields=["valor_total"])
             return redirect("listar_servicos")
     else:
         form = ServicoForm(instance=servico)
         formset = GastoExtraFormSet(instance=servico)
+        formset_anexos = AnexoServicoFormSet(instance=servico)
 
     return render(
         request,
@@ -207,6 +215,7 @@ def editar_servico(request, pk):
         {
             "form": form,
             "formset": formset,
+            "formset_anexos": formset_anexos,
             "titulo": f"Editar Serviço #{servico.pk}",
             "rota_cancelar": "listar_servicos",
             "url_voltar": "listar_servicos",
@@ -229,6 +238,22 @@ def deletar_servico(request, pk):
             "obj": servico,
             "titulo": f"Deletar Serviço #{servico.pk}",
             "cancel_url": "listar_servicos",
+        },
+    )
+
+
+def detalhar_servico(request, pk):
+    servico = get_object_or_404(Servico, pk=pk)
+    gastos = servico.gastos_extras.all()
+    anexos = servico.anexos.all()
+    return render(
+        request,
+        "detalhar_servico.html",
+        {
+            "servico": servico,
+            "gastos": gastos,
+            "anexos": anexos,
+            "titulo": f"Serviço #{servico.pk}",
         },
     )
 

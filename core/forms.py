@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra
+from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra, AnexoServico
 
 
 class TipoServicoForm(forms.ModelForm):
@@ -111,3 +111,33 @@ class ClienteForm(forms.ModelForm):
             "longitude": forms.NumberInput(attrs={"class": "form-control"}),
             "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
+
+
+class AnexoServicoForm(forms.ModelForm):
+    class Meta:
+        model = AnexoServico
+        fields = ["arquivo", "descricao"]
+        widgets = {
+            "arquivo": forms.ClearableFileInput(attrs={"class": "form-control form-control-sm"}),
+            "descricao": forms.Textarea(attrs={
+                "class": "form-control form-control-sm",
+                "rows": 2,
+                "placeholder": "Descrição da imagem/vídeo...",
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["arquivo"].required = False
+
+    def clean_arquivo(self):
+        arquivo = self.cleaned_data.get("arquivo")
+        if not arquivo and self.instance and self.instance.pk:
+            return self.instance.arquivo
+        return arquivo
+
+
+AnexoServicoFormSet = inlineformset_factory(
+    Servico, AnexoServico, form=AnexoServicoForm,
+    extra=1, can_delete=True,
+)

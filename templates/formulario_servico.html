@@ -98,6 +98,75 @@
                         </div>
                         {% endif %}
 
+                        {% if formset_anexos %}
+                        <hr class="my-4">
+                        <h5 class="text-primary mb-3"><i class="bi bi-paperclip"></i> Anexos (Imagens/Vídeos)</h5>
+                        <p class="text-muted small">Adicione fotos ou vídeos do serviço. Cada anexo pode ter uma descrição.</p>
+                        <div id="anexos-formset">
+                            {{ formset_anexos.management_form }}
+                            {% if formset_anexos.non_form_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in formset_anexos.non_form_errors %}
+                                <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% for anexo_form in formset_anexos %}
+                            <div class="anexo-form mb-3 p-3 border rounded position-relative" data-anexo-id="{{ anexo_form.instance.pk|default:'' }}">
+                                {% for hidden in anexo_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                {% if anexo_form.DELETE %}<div class="d-none">{{ anexo_form.DELETE }}</div>{% endif %}
+                                <div class="row g-2 align-items-start">
+                                    <div class="col-auto" style="width: 120px;">
+                                        {% if anexo_form.instance.pk and anexo_form.instance.arquivo %}
+                                            {% if anexo_form.instance.is_image %}
+                                            <img src="{{ anexo_form.instance.arquivo.url }}" class="img-thumbnail" style="width: 100px; height: 80px; object-fit: cover;" alt="Preview">
+                                            {% elif anexo_form.instance.is_video %}
+                                            <div class="bg-dark rounded d-flex align-items-center justify-content-center" style="width: 100px; height: 80px;">
+                                                <i class="bi bi-play-btn-fill text-white fs-2"></i>
+                                            </div>
+                                            {% else %}
+                                            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width: 100px; height: 80px;">
+                                                <i class="bi bi-file-earmark text-muted fs-2"></i>
+                                            </div>
+                                            {% endif %}
+                                        {% else %}
+                                            <div class="bg-light rounded d-flex align-items-center justify-content-center anexo-preview" style="width: 100px; height: 80px;">
+                                                <i class="bi bi-image text-muted fs-3"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col">
+                                        {% if anexo_form.instance.pk and anexo_form.instance.arquivo %}
+                                            <div class="small text-muted mb-1">{{ anexo_form.instance.arquivo.name|slice:"-30:" }}</div>
+                                            <label class="form-label small text-secondary mb-0">Descrição</label>
+                                            {{ anexo_form.descricao }}
+                                            {% if anexo_form.descricao.errors %}
+                                            <div class="invalid-feedback d-block">{{ anexo_form.descricao.errors }}</div>
+                                            {% endif %}
+                                        {% else %}
+                                            <label class="form-label small text-secondary mb-0">Arquivo</label>
+                                            {{ anexo_form.arquivo }}
+                                            {% if anexo_form.arquivo.errors %}
+                                            <div class="invalid-feedback d-block">{{ anexo_form.arquivo.errors }}</div>
+                                            {% endif %}
+                                            <label class="form-label small text-secondary mt-2 mb-0">Descrição</label>
+                                            {{ anexo_form.descricao }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-auto d-flex align-items-center pt-1">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-anexo" title="Remover">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" id="add-anexo-btn" class="btn btn-outline-primary btn-sm mt-1">
+                            <i class="bi bi-plus-circle"></i> Adicionar anexo
+                        </button>
+                        {% endif %}
+
                         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
                             <a href="{% url rota_cancelar|default:'home' %}" class="btn btn-outline-secondary">
                                 Cancelar
@@ -169,7 +238,7 @@
     }
 
     function getNewIndex() {
-        return parseInt(totalForms.value) - 1;
+        return parseInt(totalForms.value);
     }
 
     function createEmptyForm() {
@@ -212,6 +281,106 @@
 
     attachInputListeners();
     recalcularTotal();
+})();
+</script>
+{% endif %}
+
+{% if formset_anexos %}
+<script type="template/html" id="anexo-template">
+<div class="anexo-form mb-3 p-3 border rounded position-relative">
+    {% for hidden in formset_anexos.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="row g-2 align-items-start">
+        <div class="col-auto" style="width: 120px;">
+            <div class="bg-light rounded d-flex align-items-center justify-content-center anexo-preview" style="width: 100px; height: 80px;">
+                <i class="bi bi-image text-muted fs-3"></i>
+            </div>
+        </div>
+        <div class="col">
+            <label class="form-label small text-secondary mb-0">Arquivo</label>
+            {{ formset_anexos.empty_form.arquivo }}
+            <label class="form-label small text-secondary mt-2 mb-0">Descrição</label>
+            {{ formset_anexos.empty_form.descricao }}
+        </div>
+        <div class="col-auto d-flex align-items-center pt-1">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-anexo" title="Remover">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    </div>
+</div>
+</script>
+<script>
+(function() {
+    const anexosFormsetDiv = document.getElementById('anexos-formset');
+    const addAnexoBtn = document.getElementById('add-anexo-btn');
+    const anexosTotalForms = anexosFormsetDiv.querySelector('[name$="-TOTAL_FORMS"]');
+    const templateHtml = document.getElementById('anexo-template').innerHTML;
+
+    function getAnexoNewIndex() {
+        return parseInt(anexosTotalForms.value);
+    }
+
+    function createAnexoForm() {
+        const idx = getAnexoNewIndex();
+        const html = templateHtml.replace(/__prefix__/g, idx);
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        const form = div.firstElementChild;
+        const fileInput = form.querySelector('input[type="file"]');
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                const preview = form.querySelector('.anexo-preview');
+                const file = this.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        preview.innerHTML = '<img src="' + e.target.result + '" style="width: 100px; height: 80px; object-fit: cover;" class="img-thumbnail p-0" alt="Preview">';
+                    };
+                    reader.readAsDataURL(file);
+                } else if (file && file.type.startsWith('video/')) {
+                    preview.innerHTML = '<div class="bg-dark rounded d-flex align-items-center justify-content-center" style="width: 100px; height: 80px;"><i class="bi bi-play-btn-fill text-white fs-2"></i></div>';
+                }
+            });
+        }
+        return form;
+    }
+
+    addAnexoBtn.addEventListener('click', function() {
+        const form = createAnexoForm();
+        anexosFormsetDiv.appendChild(form);
+        anexosTotalForms.value = parseInt(anexosTotalForms.value) + 1;
+    });
+
+    anexosFormsetDiv.addEventListener('click', function(e) {
+        const btn = e.target.closest('.remove-anexo');
+        if (!btn) return;
+        const form = btn.closest('.anexo-form');
+        const deleteInput = form.querySelector('[name$="-DELETE"]');
+        if (deleteInput) {
+            deleteInput.checked = true;
+            form.style.display = 'none';
+        } else {
+            anexosTotalForms.value = parseInt(anexosTotalForms.value) - 1;
+            form.remove();
+        }
+    });
+
+    document.querySelectorAll('.anexo-form input[type="file"]').forEach(function(input) {
+        input.addEventListener('change', function() {
+            const preview = this.closest('.anexo-form').querySelector('.anexo-preview');
+            if (!preview) return;
+            const file = this.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.innerHTML = '<img src="' + e.target.result + '" style="width: 100px; height: 80px; object-fit: cover;" class="img-thumbnail p-0" alt="Preview">';
+                };
+                reader.readAsDataURL(file);
+            } else if (file && file.type.startsWith('video/')) {
+                preview.innerHTML = '<div class="bg-dark rounded d-flex align-items-center justify-content-center" style="width: 100px; height: 80px;"><i class="bi bi-play-btn-fill text-white fs-2"></i></div>';
+            }
+        });
+    });
 })();
 </script>
 {% endif %}

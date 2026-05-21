@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
@@ -79,6 +80,11 @@ class Servico(models.Model):
     valor_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, editable=False)
 
     status = models.CharField(max_length=20, choices=STATUS_POS, default='ORCAMENTO')
+
+    if TYPE_CHECKING:
+        from django.db.models.query import QuerySet
+        gastos_extras: QuerySet['GastoExtra']
+        anexos: QuerySet['AnexoServico']
 
     def __str__(self):
         return f"{self.tipo_servico.nome} - {self.cliente.nome}"
