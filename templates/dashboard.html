@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Hectare{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kpi-card {
+        border-left: 4px solid;
+        transition: transform 0.15s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+    }
+    .kpi-value {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    .kpi-label {
+        font-size: 0.875rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .kpi-icon {
+        font-size: 2.2rem;
+        opacity: 0.7;
+    }
+    .chart-container {
+        position: relative;
+        height: 280px;
+    }
+    .list-group-item:first-child {
+        border-top: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <h2 class="mb-4 fw-semibold">Dashboard</h2>
+
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card kpi-card border-start-primary shadow-sm" style="border-left-color: #0d6efd;">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="kpi-label">Em andamento</div>
+                        <div class="kpi-value text-primary">{{ servicos_em_andamento }}</div>
+                    </div>
+                    <i class="bi bi-gear-wide-connected kpi-icon text-primary"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card kpi-card shadow-sm" style="border-left-color: #198754;">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="kpi-label">Faturamento do mês</div>
+                        <div class="kpi-value text-success">R$ {{ faturamento_mes|floatformat:2 }}</div>
+                    </div>
+                    <i class="bi bi-cash-stack kpi-icon text-success"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card kpi-card shadow-sm" style="border-left-color: #fd7e14;">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="kpi-label">Km rodados</div>
+                        <div class="kpi-value text-warning">{{ km_total|floatformat:1 }} km</div>
+                    </div>
+                    <i class="bi bi-speedometer2 kpi-icon text-warning"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card kpi-card shadow-sm" style="border-left-color: #6f42c1;">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="kpi-label">Clientes ativos</div>
+                        <div class="kpi-value text-purple" style="color: #6f42c1;">{{ total_clientes }}</div>
+                    </div>
+                    <i class="bi bi-people-fill kpi-icon" style="color: #6f42c1;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-pie-chart-fill me-2"></i>Status dos Serviços
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-bar-chart-fill me-2"></i>Faturamento Mensal
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-clock-history me-2"></i>Últimos Serviços</span>
+                    <a href="{% url 'listar_servicos' %}" class="btn btn-sm btn-outline-primary">Ver todos</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if ultimos_servicos %}
+                    <div class="list-group list-group-flush">
+                        {% for s in ultimos_servicos %}
+                        <a href="{% url 'detalhar_servico' s.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-secondary me-2">#{{ s.pk }}</span>
+                                <strong>{{ s.tipo_servico.nome }}</strong>
+                                <span class="text-muted ms-2">{{ s.cliente.nome }}</span>
+                            </div>
+                            <small class="text-muted">{{ s.data_criacao|date:"d/m/Y" }}</small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">Nenhum serviço registrado.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-calendar-check me-2"></i>Próximos Agendamentos</span>
+                    <a href="{% url 'listar_servicos' %}" class="btn btn-sm btn-outline-primary">Ver todos</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if proximos_agendamentos %}
+                    <div class="list-group list-group-flush">
+                        {% for s in proximos_agendamentos %}
+                        <a href="{% url 'detalhar_servico' s.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-info me-2">Agendado</span>
+                                <strong>{{ s.tipo_servico.nome }}</strong>
+                                <span class="text-muted ms-2">{{ s.cliente.nome }}</span>
+                            </div>
+                            {% if s.data_inicio %}
+                            <small class="text-muted">{{ s.data_inicio|date:"d/m/Y H:i" }}</small>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">Nenhum agendamento futuro.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ status_labels_json|safe }},
+            datasets: [{
+                data: {{ status_values_json|safe }},
+                backgroundColor: {{ status_colors_json|safe }},
+                borderWidth: 2,
+                borderColor: '#fff',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { padding: 20, usePointStyle: true, pointStyleWidth: 10 }
+                }
+            }
+        }
+    });
+
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(revenueCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ month_labels_json|safe }},
+            datasets: [{
+                label: 'Faturamento (R$)',
+                data: {{ month_values_json|safe }},
+                backgroundColor: '#198754',
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR') }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

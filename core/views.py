@@ -1,22 +1,80 @@
+import json
+from datetime import timedelta
+
+from django.db.models import Sum, Count
+from django.db.models.functions import TruncMonth
 from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+
 from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra
 from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet, AnexoServicoFormSet
 
 
 def home(request):
-    servicos = Servico.objects.all().order_by("-data_inicio")
-    return render(
-        request,
-        "listar_generico.html",
-        {
-            "titulo": "🛠️ Ordens de Serviço",
-            "url_criar": "criar_servico",
-            "botao_novo": "+ Nova OS",
-            "linhas_partial": "partials/linhas_servicos.html",
-            "itens": servicos,
-            "colunas": ["#", "Tipo", "Cliente", "Técnico", "Status", "Início", "Total"],
-        },
-    )
+    hoje = timezone.now()
+    primeiro_dia_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    servicos_em_andamento = Servico.objects.filter(status='EM_ANDAMENTO').count()
+
+    faturamento_mes = Servico.objects.filter(
+        status='CONCLUIDO',
+        data_competencia=primeiro_dia_mes,
+    ).aggregate(total=Sum('valor_total'))['total'] or 0
+
+    total_clientes = Cliente.objects.filter(ativo=True).count()
+    km_total = Servico.objects.aggregate(total=Sum('km_rodado'))['total'] or 0
+
+    status_map = dict(Servico.STATUS_POS)
+    color_map = {
+        'ORCAMENTO': '#0d6efd', 'AGENDADO': '#6f42c1',
+        'EM_ANDAMENTO': '#fd7e14', 'CONCLUIDO': '#198754', 'CANCELADO': '#dc3545',
+    }
+    status_counts = dict(Servico.objects.values_list('status').annotate(count=Count('id')))
+    status_labels = [status_map[k] for k, _ in Servico.STATUS_POS]
+    status_values = [status_counts.get(k, 0) for k, _ in Servico.STATUS_POS]
+    status_colors = [color_map[k] for k, _ in Servico.STATUS_POS]
+
+    months = []
+    for i in range(5, -1, -1):
+        month_start = (primeiro_dia_mes - timedelta(days=i * 32)).replace(day=1)
+        months.append(month_start)
+
+    revenue_data = Servico.objects.filter(
+        status='CONCLUIDO',
+        data_competencia__gte=months[0],
+    ).annotate(month=TruncMonth('data_competencia')).values('month').annotate(
+        total=Sum('valor_total')
+    ).order_by('month')
+
+    revenue_by_month = {}
+    for entry in revenue_data:
+        em = entry['month']
+        revenue_by_month[(em.year, em.month)] = float(entry['total'] or 0)
+
+    month_labels = [m.strftime('%m/%Y') for m in months]
+    month_values = [revenue_by_month.get((m.year, m.month), 0) for m in months]
+
+    ultimos_servicos = Servico.objects.select_related(
+        'cliente', 'tecnico', 'tipo_servico'
+    ).order_by('-data_criacao')[:5]
+
+    proximos_agendamentos = Servico.objects.filter(
+        status='AGENDADO', data_inicio__gte=hoje,
+    ).select_related('cliente', 'tecnico', 'tipo_servico').order_by('data_inicio')[:5]
+
+    return render(request, 'dashboard.html', {
+        'servicos_em_andamento': servicos_em_andamento,
+        'faturamento_mes': faturamento_mes,
+        'total_clientes': total_clientes,
+        'km_total': km_total,
+        'status_labels_json': json.dumps(status_labels),
+        'status_values_json': json.dumps(status_values),
+        'status_colors_json': json.dumps(status_colors),
+        'month_labels_json': json.dumps(month_labels),
+        'month_values_json': json.dumps(month_values),
+        'ultimos_servicos': ultimos_servicos,
+        'proximos_agendamentos': proximos_agendamentos,
+    })
 
 
 def criar_tipo_servico(request):
