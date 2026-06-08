@@ -1,0 +1,38 @@
+<form method="GET" class="row g-2 align-items-end mb-3" id="filtro-form">
+    <div class="col-auto">
+        <label for="filtro-mes" class="form-label small text-muted mb-1">Mês</label>
+        <select name="mes" id="filtro-mes" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">Todos</option>
+            {% for m in meses_disponiveis %}
+            <option value="{{ m.value }}" {% if m.value == mes_selecionado %}selected{% endif %}>{{ m.label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-auto">
+        <label for="filtro-tipo" class="form-label small text-muted mb-1">Tipo de Serviço</label>
+        <select name="tipo_servico" id="filtro-tipo" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">Todos</option>
+            {% for t in tipos_servico %}
+            <option value="{{ t.pk }}" {% if t.pk|stringformat:"s" == tipo_servico_selecionado %}selected{% endif %}>{{ t.nome }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-auto">
+        <label for="filtro-status" class="form-label small text-muted mb-1">Status</label>
+        <select name="status" id="filtro-status" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">Todos</option>
+            {% for key, label in status_opcoes %}
+            <option value="{{ key }}" {% if key == status_selecionado %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    {% if tem_filtros %}
+    <div class="col-auto">
+        <label class="form-label small text-muted mb-1">&nbsp;</label>
+        <a href="?" class="btn btn-sm btn-outline-secondary d-block">Limpar filtros</a>
+    </div>
+    {% endif %}
+</form>

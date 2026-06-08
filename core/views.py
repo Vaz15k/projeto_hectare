@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncMonth
@@ -10,36 +10,95 @@ from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra
 from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet, AnexoServicoFormSet
 
 
+def _build_filtro_ctx(request):
+    mes = request.GET.get('mes', '')
+    tipo_servico_id = request.GET.get('tipo_servico', '')
+    status = request.GET.get('status', '')
+
+    meses_disponiveis = Servico.objects.dates('data_competencia', 'month', order='DESC')
+    tipos_servico = TipoServico.objects.all()
+
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+    query_string = query_params.urlencode()
+
+    ctx = {
+        'mes_selecionado': mes,
+        'tipo_servico_selecionado': str(tipo_servico_id) if tipo_servico_id else '',
+        'status_selecionado': status,
+        'meses_disponiveis': [
+            {'value': m.strftime('%Y-%m'), 'label': m.strftime('%m/%Y')}
+            for m in meses_disponiveis
+        ],
+        'tipos_servico': tipos_servico,
+        'status_opcoes': Servico.STATUS_POS,
+        'tem_filtros': bool(mes or tipo_servico_id or status),
+        'query_string': query_string,
+    }
+
+    def aplicar(qs, excluir_mes=False, excluir_status=False):
+        if mes and not excluir_mes:
+            try:
+                y, m = map(int, mes.split('-'))
+                qs = qs.filter(data_competencia__year=y, data_competencia__month=m)
+            except (ValueError, TypeError):
+                pass
+        if tipo_servico_id:
+            try:
+                qs = qs.filter(tipo_servico_id=int(tipo_servico_id))
+            except (ValueError, TypeError):
+                pass
+        if status and not excluir_status:
+            qs = qs.filter(status=status)
+        return qs
+
+    return ctx, aplicar
+
+
 def home(request):
     hoje = timezone.now()
     primeiro_dia_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    servicos_em_andamento = Servico.objects.filter(status='EM_ANDAMENTO').count()
+    filtro_ctx, aplicar_filtro = _build_filtro_ctx(request)
+    base = aplicar_filtro(Servico.objects.all())
 
-    faturamento_mes = Servico.objects.filter(
+    mes_ref = primeiro_dia_mes
+    if filtro_ctx['mes_selecionado']:
+        try:
+            y, m = map(int, filtro_ctx['mes_selecionado'].split('-'))
+            mes_ref = datetime(y, m, 1, tzinfo=primeiro_dia_mes.tzinfo)
+        except (ValueError, TypeError):
+            pass
+
+    servicos_em_andamento = base.filter(status='EM_ANDAMENTO').count()
+
+    faturamento_mes = base.filter(
         status='CONCLUIDO',
-        data_competencia=primeiro_dia_mes,
+        data_competencia=mes_ref,
     ).aggregate(total=Sum('valor_total'))['total'] or 0
 
-    total_clientes = Cliente.objects.filter(ativo=True).count()
-    km_total = Servico.objects.aggregate(total=Sum('km_rodado'))['total'] or 0
+    clientes_base = Cliente.objects.all()
+    total_clientes = clientes_base.filter(ativo=True).count()
+    km_total = base.aggregate(total=Sum('km_rodado'))['total'] or 0
 
     status_map = dict(Servico.STATUS_POS)
     color_map = {
         'ORCAMENTO': '#0d6efd', 'AGENDADO': '#6f42c1',
         'EM_ANDAMENTO': '#fd7e14', 'CONCLUIDO': '#198754', 'CANCELADO': '#dc3545',
     }
-    status_counts = dict(Servico.objects.values_list('status').annotate(count=Count('id')))
+
+    status_qs = aplicar_filtro(Servico.objects.all(), excluir_status=True)
+    status_counts = dict(status_qs.values_list('status').annotate(count=Count('id')))
     status_labels = [status_map[k] for k, _ in Servico.STATUS_POS]
     status_values = [status_counts.get(k, 0) for k, _ in Servico.STATUS_POS]
     status_colors = [color_map[k] for k, _ in Servico.STATUS_POS]
 
     months = []
     for i in range(5, -1, -1):
-        month_start = (primeiro_dia_mes - timedelta(days=i * 32)).replace(day=1)
-        months.append(month_start)
+        months.append((mes_ref - timedelta(days=i * 32)).replace(day=1))
 
-    revenue_data = Servico.objects.filter(
+    revenue_qs = aplicar_filtro(Servico.objects.all(), excluir_mes=True)
+    revenue_data = revenue_qs.filter(
         status='CONCLUIDO',
         data_competencia__gte=months[0],
     ).annotate(month=TruncMonth('data_competencia')).values('month').annotate(
@@ -54,15 +113,16 @@ def home(request):
     month_labels = [m.strftime('%m/%Y') for m in months]
     month_values = [revenue_by_month.get((m.year, m.month), 0) for m in months]
 
-    ultimos_servicos = Servico.objects.select_related(
+    ultimos_servicos = base.select_related(
         'cliente', 'tecnico', 'tipo_servico'
     ).order_by('-data_criacao')[:5]
 
-    proximos_agendamentos = Servico.objects.filter(
+    proximos_agendamentos = base.filter(
         status='AGENDADO', data_inicio__gte=hoje,
     ).select_related('cliente', 'tecnico', 'tipo_servico').order_by('data_inicio')[:5]
 
     return render(request, 'dashboard.html', {
+        **filtro_ctx,
         'servicos_em_andamento': servicos_em_andamento,
         'faturamento_mes': faturamento_mes,
         'total_clientes': total_clientes,
@@ -202,16 +262,26 @@ def editar_empregado(request, pk):
 
 
 def listar_servicos(request):
-    servicos = Servico.objects.all().order_by("-data_inicio")
+    from django.core.paginator import Paginator
+
+    filtro_ctx, aplicar_filtro = _build_filtro_ctx(request)
+    servicos = aplicar_filtro(Servico.objects.all()).order_by('-data_inicio')
+
+    paginator = Paginator(servicos, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
     return render(
         request,
-        "listar_generico.html",
+        'listar_generico.html',
         {
-            "titulo": "🛠️ Serviços",
-            "url_criar": "criar_servico",
-            "linhas_partial": "partials/linhas_servicos.html",
-            "itens": servicos,
-            "colunas": ["#", "Tipo", "Cliente", "Técnico", "Status", "Início", "Total"],
+            **filtro_ctx,
+            'titulo': 'Serviços',
+            'url_criar': 'criar_servico',
+            'linhas_partial': 'partials/linhas_servicos.html',
+            'itens': page_obj,
+            'colunas': ['#', 'Tipo', 'Cliente', 'Técnico', 'Status', 'Início', 'Total'],
+            'mostrar_filtros': True,
         },
     )
 

@@ -2,6 +2,11 @@
 
 {% block content %}
 <div class="container-fluid p-0">
+
+    {% if mostrar_filtros %}
+        {% include 'partials/filtro_bar.html' %}
+    {% endif %}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h3 mb-0 text-gray-800">{{ titulo }}</h2>
         {% if url_criar %}
@@ -39,21 +44,27 @@
                 </table>
             </div>
         </div>
-        
+
         {% if itens.has_other_pages %}
         <div class="card-footer bg-white py-3">
             <nav aria-label="Page navigation">
                 <ul class="pagination justify-content-center mb-0">
                     {% if itens.has_previous %}
-                    <li class="page-item"><a class="page-link" href="?page={{ itens.previous_page_number }}">Anterior</a></li>
+                    <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ itens.previous_page_number }}">Anterior</a></li>
                     {% else %}
                     <li class="page-item disabled"><span class="page-link">Anterior</span></li>
                     {% endif %}
-                    
-                    <li class="page-item active"><span class="page-link">{{ itens.number }}</span></li>
-                    
+
+                    {% for num in itens.paginator.page_range %}
+                        {% if num == itens.number %}
+                        <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                        {% elif num >= itens.number|add:"-2" and num <= itens.number|add:"2" %}
+                        <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ num }}">{{ num }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+
                     {% if itens.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ itens.next_page_number }}">Próximo</a></li>
+                    <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ itens.next_page_number }}">Próximo</a></li>
                     {% else %}
                     <li class="page-item disabled"><span class="page-link">Próximo</span></li>
                     {% endif %}
