@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8" style="max-width: 800px;">
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0 text-primary"><i class="bi bi-gear"></i> {{ titulo }}</h4>
+                <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+
+            <div class="card shadow border-0">
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <h6 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-building"></i> Dados da Empresa
+                        </h6>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold small">Nome da Empresa</label>
+                                {{ form.nome_empresa }}
+                                {% if form.nome_empresa.errors %}
+                                <div class="text-danger small mt-1">{{ form.nome_empresa.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">CNPJ</label>
+                                {{ form.cnpj }}
+                                {% if form.cnpj.errors %}
+                                <div class="text-danger small mt-1">{{ form.cnpj.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Endereço</label>
+                                {{ form.endereco }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Telefone</label>
+                                {{ form.telefone }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">E-mail</label>
+                                {{ form.email }}
+                            </div>
+                        </div>
+
+                        <h6 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-image"></i> Logo
+                        </h6>
+
+                        <div class="mb-4">
+                            {% if config.logo %}
+                            <div class="mb-2">
+                                <img src="{{ config.logo.url }}" alt="Logo atual" style="max-height: 80px; max-width: 200px;" class="border rounded p-2">
+                            </div>
+                            {% endif %}
+                            {{ form.logo }}
+                            {% if form.logo.errors %}
+                            <div class="text-danger small mt-1">{{ form.logo.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <h6 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-file-earmark-pdf"></i> Personalização do PDF
+                        </h6>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Texto do Cabeçalho</label>
+                                {{ form.texto_cabecalho }}
+                                <small class="form-text text-muted">Texto exibido no topo do PDF exportado (ex: slogan, informações adicionais)</small>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small">Texto do Rodapé</label>
+                                {{ form.texto_rodape }}
+                                <small class="form-text text-muted">Texto exibido no rodapé do PDF (ex: agradecimento, informações de contato)</small>
+                            </div>
+                        </div>
+
+                        <h6 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-qr-code"></i> Chave Pix
+                        </h6>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Tipo da Chave</label>
+                                {{ form.tipo_chave_pix }}
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold small">Chave Pix</label>
+                                {{ form.chave_pix }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Salvar Configurações
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra, AnexoServico
+from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra, AnexoServico, Configuracao
 
 
 class TipoServicoForm(forms.ModelForm):
@@ -141,3 +141,32 @@ AnexoServicoFormSet = inlineformset_factory(
     Servico, AnexoServico, form=AnexoServicoForm,
     extra=1, can_delete=True,
 )
+
+
+class ConfiguracaoForm(forms.ModelForm):
+    class Meta:
+        model = Configuracao
+        fields = [
+            "nome_empresa",
+            "cnpj",
+            "endereco",
+            "telefone",
+            "email",
+            "logo",
+            "texto_cabecalho",
+            "texto_rodape",
+            "chave_pix",
+            "tipo_chave_pix",
+        ]
+        widgets = {
+            "nome_empresa": forms.TextInput(attrs={"class": "form-control"}),
+            "cnpj": forms.TextInput(attrs={"class": "form-control", "data-mask": "documento"}),
+            "endereco": forms.TextInput(attrs={"class": "form-control"}),
+            "telefone": forms.TextInput(attrs={"class": "form-control", "data-mask": "telefone"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "texto_cabecalho": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "texto_rodape": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "chave_pix": forms.TextInput(attrs={"class": "form-control"}),
+            "tipo_chave_pix": forms.Select(attrs={"class": "form-control"}),
+        }

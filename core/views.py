@@ -1,13 +1,19 @@
 import json
+import os
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncMonth
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from django.template.loader import render_to_string
+from django.http import HttpResponse
 
-from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra
-from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet, AnexoServicoFormSet
+from xhtml2pdf import pisa
+
+from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra, Configuracao
+from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet, AnexoServicoFormSet, ConfiguracaoForm
 
 
 def _build_filtro_ctx(request):
@@ -445,3 +451,166 @@ def editar_cliente(request, pk):
             "submit_label": "Atualizar",
         },
     )
+
+
+# --------- Configurações Views ---------
+
+
+def editar_configuracoes(request):
+    config = Configuracao.load()
+    if request.method == "POST":
+        form = ConfiguracaoForm(request.POST, request.FILES, instance=config)
+        if form.is_valid():
+            form.save()
+            return redirect("editar_configuracoes")
+    else:
+        form = ConfiguracaoForm(instance=config)
+
+    return render(
+        request,
+        "configuracoes.html",
+        {
+            "form": form,
+            "config": config,
+            "titulo": "Configurações",
+        },
+    )
+
+
+# --------- Exportar PDF Views ---------
+
+
+def _link_callback(uri, rel):
+    from django.conf import settings
+    import os
+
+    if os.path.isfile(uri):
+        return uri
+
+    if uri.startswith(settings.MEDIA_URL):
+        path = os.path.join(settings.MEDIA_ROOT, uri.replace(settings.MEDIA_URL, ''))
+    elif uri.startswith(settings.STATIC_URL):
+        path = os.path.join(settings.STATIC_ROOT or os.path.join(settings.BASE_DIR, 'static'), uri.replace(settings.STATIC_URL, ''))
+    elif uri.startswith('/'):
+        path = os.path.join(settings.MEDIA_ROOT, uri.lstrip('/'))
+    else:
+        return uri
+
+    if not os.path.isfile(path):
+        return uri
+
+    return path
+
+
+def _gerar_payload_pix(chave_pix, nome_beneficiario, cidade, valor, txid='***'):
+    import crcmod
+
+    valor_formatado = f"{float(valor):.2f}" if valor else "0.00"
+
+    # Formata chave de telefone automaticamente
+    if chave_pix.isdigit() and len(chave_pix) == 11:
+        chave_pix = f"+55{chave_pix}"
+    elif chave_pix.isdigit() and len(chave_pix) == 10:
+        chave_pix = f"+55{chave_pix}"
+
+    payload = "000201"
+
+    # Merchant Account Information (tag 26)
+    gui = "0014BR.GOV.BCB.PIX"
+    chave = f"01{len(chave_pix):02d}{chave_pix}"
+    merchant_info = gui + chave
+    payload += f"26{len(merchant_info):02d}{merchant_info}"
+
+    payload += "52040000"
+    payload += "5303986"
+    payload += f"54{len(valor_formatado):02d}{valor_formatado}"
+    payload += "5802BR"
+    payload += f"59{len(nome_beneficiario):02d}{nome_beneficiario[:25]}"
+    payload += f"60{len(cidade):02d}{cidade[:15]}"
+
+    txid_block = f"05{len(txid):02d}{txid}"
+    payload += f"62{len(txid_block):02d}{txid_block}"
+
+    payload_com_crc = payload + "6304"
+
+    crc16 = crcmod.mkCrcFun(0x11021, rev=False, initCrc=0xFFFF, xorOut=0x0000)
+    crc_calculado = hex(crc16(payload_com_crc.encode('utf-8')))[2:].upper().zfill(4)
+
+    return payload_com_crc + crc_calculado
+
+
+def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
+    import qrcode
+    import tempfile
+    import os
+
+    payload = _gerar_payload_pix(chave_pix, nome_empresa, cidade, valor, txid)
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=20,
+        border=2,
+    )
+    qr.add_data(payload)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    temp_path = os.path.join(tempfile.gettempdir(), f'qrcode_pix_{txid}.png')
+    img.save(temp_path, 'PNG')
+
+    return temp_path
+
+
+def exportar_servico_pdf(request, pk):
+    servico = get_object_or_404(
+        Servico.objects.select_related('cliente', 'tecnico', 'tipo_servico'),
+        pk=pk
+    )
+    gastos = servico.gastos_extras.all()
+    config = Configuracao.load()
+
+    valor_km_total = Decimal('0.00')
+    valor_hora_total = Decimal('0.00')
+    if servico.km_rodado and servico.valor_km:
+        valor_km_total = servico.km_rodado * servico.valor_km
+    if servico.hora_trabalhada and servico.valor_hora:
+        valor_hora_total = servico.hora_trabalhada * servico.valor_hora
+
+    logo_url = None
+    if config.logo:
+        logo_url = config.logo.url
+
+    qrcode_path = None
+    if config.chave_pix:
+        cidade = config.endereco.split(',')[-1].strip() if config.endereco else '***'
+        qrcode_path = _gerar_qrcode_pix(
+            config.chave_pix,
+            config.nome_empresa or '***',
+            cidade,
+            servico.valor_total,
+            txid=f'OS{servico.pk:04d}'
+        )
+
+    html_string = render_to_string('pdf/servico.html', {
+        'servico': servico,
+        'gastos': gastos,
+        'config': config,
+        'valor_km_total': valor_km_total,
+        'valor_hora_total': valor_hora_total,
+        'data_geracao': timezone.now().strftime('%d/%m/%Y às %H:%M'),
+        'logo_url': logo_url,
+        'qrcode_path': qrcode_path,
+    })
+
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"OS_{servico.cliente.nome.replace(' ', '_')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    pisa.CreatePDF(html_string, dest=response, link_callback=_link_callback)
+
+    if qrcode_path and os.path.exists(qrcode_path):
+        os.remove(qrcode_path)
+
+    return response
