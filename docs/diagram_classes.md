@@ -61,9 +61,29 @@ classDiagram
         +Decimal valor
     }
 
+    class Configuracao {
+        +String nome_empresa
+        +String cnpj
+        +String endereco
+        +String telefone
+        +String email
+        +Image logo
+        +String texto_cabecalho
+        +String texto_rodape
+        +String chave_pix
+        +String tipo_chave_pix
+        +load() Configuracao
+    }
+
+    class QRCodePix {
+        +gerar_payload() String
+        +gerar_imagem() Image
+    }
+
     Cliente "1" <-- "0..*" Servico : solicita
     Empregado "1" <-- "0..*" Servico : realiza (tecnico)
     TipoServico "1" <-- "0..*" Servico : categoriza
     Servico "1" *-- "0..*" AnexoServico : contém
     Servico "1" o-- "0..*" NotaFiscal : gera
     Servico "1" *-- "0..*" GastoExtra : possui
+    Configuracao "1" --> "0..*" QRCodePix : gera
