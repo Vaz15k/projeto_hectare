@@ -129,7 +129,7 @@ class AnexoServicoForm(forms.ModelForm):
         model = AnexoServico
         fields = ["arquivo", "descricao"]
         widgets = {
-            "arquivo": forms.ClearableFileInput(attrs={"class": "form-control form-control-sm"}),
+            "arquivo": forms.FileInput(attrs={"class": "form-control form-control-sm"}),
             "descricao": forms.Textarea(attrs={
                 "class": "form-control form-control-sm",
                 "rows": 2,
@@ -181,9 +181,19 @@ class MaquinaForm(forms.ModelForm):
             "modelo": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: MF 290"}),
             "numero_serie": forms.TextInput(attrs={"class": "form-control", "placeholder": "Número de série"}),
             "ano": forms.NumberInput(attrs={"class": "form-control", "placeholder": "Ex: 2020"}),
-            "foto": forms.ClearableFileInput(attrs={"class": "form-control form-control-sm"}),
+            "foto": forms.FileInput(attrs={"class": "form-control form-control-sm"}),
             "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
+
+    def clean_foto(self):
+        foto = self.cleaned_data.get("foto")
+        if self.data.get(self.add_prefix("foto-clear")):
+            if self.instance and self.instance.pk and self.instance.foto:
+                self.instance.foto.delete(save=False)
+            return None
+        if not foto and self.instance and self.instance.pk:
+            return self.instance.foto
+        return foto
 
 
 MaquinaInlineFormSet = inlineformset_factory(
@@ -196,7 +206,7 @@ MaquinaInlineFormSet = inlineformset_factory(
         "modelo": forms.TextInput(attrs={"class": "form-control form-control-sm", "placeholder": "Ex: MF 290"}),
         "numero_serie": forms.TextInput(attrs={"class": "form-control form-control-sm", "placeholder": "Nº de série"}),
         "ano": forms.NumberInput(attrs={"class": "form-control form-control-sm", "placeholder": "Ex: 2020"}),
-        "foto": forms.ClearableFileInput(attrs={"class": "form-control form-control-sm"}),
+        "foto": forms.FileInput(attrs={"class": "form-control form-control-sm"}),
         "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
     },
 )
@@ -223,9 +233,19 @@ class ConfiguracaoForm(forms.ModelForm):
             "endereco": forms.TextInput(attrs={"class": "form-control"}),
             "telefone": forms.TextInput(attrs={"class": "form-control", "data-mask": "telefone"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
-            "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "logo": forms.FileInput(attrs={"class": "form-control"}),
             "texto_cabecalho": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "texto_rodape": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "chave_pix": forms.TextInput(attrs={"class": "form-control"}),
             "tipo_chave_pix": forms.Select(attrs={"class": "form-control"}),
         }
+
+    def clean_logo(self):
+        logo = self.cleaned_data.get("logo")
+        if self.data.get(self.add_prefix("logo-clear")):
+            if self.instance and self.instance.pk and self.instance.logo:
+                self.instance.logo.delete(save=False)
+            return None
+        if not logo and self.instance and self.instance.pk:
+            return self.instance.logo
+        return logo

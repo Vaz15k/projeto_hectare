@@ -56,11 +56,19 @@
 
                         <div class="mb-4">
                             {% if config.logo %}
-                            <div class="mb-2">
+                            <div class="mb-2 foto-preview">
                                 <img src="{{ config.logo.url }}" alt="Logo atual" style="max-height: 80px; max-width: 200px;" class="border rounded p-2">
                             </div>
-                            {% endif %}
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                {{ form.logo }}
+                                <span class="small text-muted text-nowrap arquivo-nome">{{ config.logo.name|slice:"-40:" }}</span>
+                                <label class="small text-danger mb-0 text-nowrap" style="cursor: pointer;">
+                                    <input type="checkbox" name="logo-clear" class="form-check-input limpar-foto" style="margin-right: 2px;"> Limpar
+                                </label>
+                            </div>
+                            {% else %}
                             {{ form.logo }}
+                            {% endif %}
                             {% if form.logo.errors %}
                             <div class="text-danger small mt-1">{{ form.logo.errors.0 }}</div>
                             {% endif %}
@@ -110,4 +118,23 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Limpar logo: esconde preview ao marcar checkbox
+document.addEventListener('change', function(e) {
+    if (!e.target.classList.contains('limpar-foto')) return;
+    const container = e.target.closest('.mb-4');
+    const preview = container?.querySelector('.foto-preview');
+    const nomeArquivo = container?.querySelector('.arquivo-nome');
+    if (e.target.checked) {
+        if (preview) preview.style.display = 'none';
+        if (nomeArquivo) nomeArquivo.style.textDecoration = 'line-through';
+    } else {
+        if (preview) preview.style.display = '';
+        if (nomeArquivo) nomeArquivo.style.textDecoration = '';
+    }
+});
+</script>
 {% endblock %}

@@ -38,14 +38,9 @@
                                         <div class="invalid-feedback d-block">{{ maq_form.nome.errors }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-6">
                                         <label class="form-label small text-secondary">Marca</label>
                                         {{ maq_form.marca }}
-                                    </div>
-                                    <div class="col-md-3 d-flex align-items-end">
-                                        <button type="button" class="btn btn-outline-danger btn-sm remove-maquina w-100" title="Remover">
-                                            <i class="bi bi-trash"></i> Remover
-                                        </button>
                                     </div>
                                 </div>
                                 <div class="row g-2 mt-2">
@@ -65,20 +60,30 @@
                                 <div class="row g-2 mt-2">
                                     <div class="col-12">
                                         <label class="form-label small text-secondary">Foto</label>
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            {{ maq_form.foto }}
+                                            {% if maq_form.instance.pk and maq_form.instance.foto %}
+                                            <span class="small text-muted text-nowrap arquivo-nome">{{ maq_form.instance.foto.name|slice:"-40:" }}</span>
+                                            <label class="small text-danger mb-0 text-nowrap" style="cursor: pointer;">
+                                                <input type="checkbox" name="{{ maq_form.foto.html_name }}-clear" class="form-check-input limpar-foto" style="margin-right: 2px;"> Limpar
+                                            </label>
+                                            {% endif %}
+                                        </div>
                                         {% if maq_form.instance.pk and maq_form.instance.foto %}
-                                        <div class="mb-2">
+                                        <div class="mt-2 foto-preview">
                                             <img src="{{ maq_form.instance.foto.url }}" style="max-height: 80px;" class="rounded border" alt="Foto">
-                                            <small class="text-muted ms-2">Atual</small>
                                         </div>
                                         {% endif %}
-                                        {{ maq_form.foto }}
                                     </div>
                                 </div>
-                                <div class="mt-2">
+                                <div class="d-flex justify-content-between align-items-center mt-3">
                                     <div class="form-check">
                                         {{ maq_form.ativo }}
                                         <label class="form-check-label small text-secondary" for="{{ maq_form.ativo.id_for_label }}">Ativo</label>
                                     </div>
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-maquina" title="Remover">
+                                        <i class="bi bi-trash"></i> Remover
+                                    </button>
                                 </div>
                                 {% if maq_form.DELETE %}
                                 <div class="d-none">{{ maq_form.DELETE }}</div>
@@ -115,14 +120,9 @@
             <label class="form-label small text-secondary">Nome da Máquina</label>
             {{ formset_maquinas.empty_form.nome }}
         </div>
-        <div class="col-md-3">
+        <div class="col-md-6">
             <label class="form-label small text-secondary">Marca</label>
             {{ formset_maquinas.empty_form.marca }}
-        </div>
-        <div class="col-md-3 d-flex align-items-end">
-            <button type="button" class="btn btn-outline-danger btn-sm remove-maquina w-100" title="Remover">
-                <i class="bi bi-trash"></i> Remover
-            </button>
         </div>
     </div>
     <div class="row g-2 mt-2">
@@ -145,11 +145,14 @@
             {{ formset_maquinas.empty_form.foto }}
         </div>
     </div>
-    <div class="mt-2">
+    <div class="d-flex justify-content-between align-items-center mt-3">
         <div class="form-check">
             {{ formset_maquinas.empty_form.ativo }}
             <label class="form-check-label small text-secondary" for="{{ formset_maquinas.empty_form.ativo.id_for_label }}">Ativo</label>
         </div>
+        <button type="button" class="btn btn-outline-danger btn-sm remove-maquina" title="Remover">
+            <i class="bi bi-trash"></i> Remover
+        </button>
     </div>
 </div>
 </script>
@@ -184,6 +187,21 @@
         } else {
             maquinasTotalForms.value = parseInt(maquinasTotalForms.value) - 1;
             form.remove();
+        }
+    });
+
+    // Limpar foto: esconde preview ao marcar checkbox
+    document.addEventListener('change', function(e) {
+        if (!e.target.classList.contains('limpar-foto')) return;
+        const form = e.target.closest('.maquina-inline-form');
+        const preview = form?.querySelector('.foto-preview');
+        const nomeArquivo = form?.querySelector('.arquivo-nome');
+        if (e.target.checked) {
+            if (preview) preview.style.display = 'none';
+            if (nomeArquivo) nomeArquivo.style.textDecoration = 'line-through';
+        } else {
+            if (preview) preview.style.display = '';
+            if (nomeArquivo) nomeArquivo.style.textDecoration = '';
         }
     });
 })();
