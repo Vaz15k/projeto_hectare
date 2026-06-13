@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8 col-xl-6" style="max-width: 900px;">
+            <div class="card shadow border-0">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0 text-primary"><i class="bi bi-gear-wide-connected"></i> {{ titulo }}</h4>
+                    <a href="{% url 'editar_cliente' cliente.pk %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-pencil"></i> Editar Cliente
+                    </a>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+
+                        <h5 class="text-secondary mb-3">Máquinas/Equipamentos</h5>
+                        <p class="text-muted small">Cadastre e gerencie as máquinas deste cliente.</p>
+
+                        <div id="maquinas-formset">
+                            {{ formset_maquinas.management_form }}
+                            {% if formset_maquinas.non_form_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in formset_maquinas.non_form_errors %}
+                                <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% for maq_form in formset_maquinas %}
+                            <div class="maquina-inline-form mb-4 p-3 border rounded position-relative">
+                                {% for hidden in maq_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-secondary">Nome da Máquina</label>
+                                        {{ maq_form.nome }}
+                                        {% if maq_form.nome.errors %}
+                                        <div class="invalid-feedback d-block">{{ maq_form.nome.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-secondary">Marca</label>
+                                        {{ maq_form.marca }}
+                                    </div>
+                                    <div class="col-md-3 d-flex align-items-end">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-maquina w-100" title="Remover">
+                                            <i class="bi bi-trash"></i> Remover
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="row g-2 mt-2">
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-secondary">Modelo</label>
+                                        {{ maq_form.modelo }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-secondary">Nº de Série</label>
+                                        {{ maq_form.numero_serie }}
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small text-secondary">Ano</label>
+                                        {{ maq_form.ano }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-secondary">Foto</label>
+                                        {% if maq_form.instance.pk and maq_form.instance.foto %}
+                                        <div class="mb-1">
+                                            <img src="{{ maq_form.instance.foto.url }}" style="max-height: 50px;" class="rounded" alt="Foto">
+                                            <small class="text-muted ms-1">Atual</small>
+                                        </div>
+                                        {% endif %}
+                                        {{ maq_form.foto }}
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <div class="form-check">
+                                        {{ maq_form.ativo }}
+                                        <label class="form-check-label small text-secondary" for="{{ maq_form.ativo.id_for_label }}">Ativo</label>
+                                    </div>
+                                </div>
+                                {% if maq_form.DELETE %}
+                                <div class="d-none">{{ maq_form.DELETE }}</div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" id="add-maquina-btn" class="btn btn-outline-primary btn-sm mt-1">
+                            <i class="bi bi-plus-circle"></i> Adicionar máquina
+                        </button>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                            <a href="{% url 'listar_clientes' %}" class="btn btn-outline-secondary">
+                                Voltar
+                            </a>
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-check-lg"></i> Salvar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="template/html" id="maquina-template">
+<div class="maquina-inline-form mb-4 p-3 border rounded position-relative">
+    {% for hidden in formset_maquinas.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="row g-2">
+        <div class="col-md-6">
+            <label class="form-label small text-secondary">Nome da Máquina</label>
+            {{ formset_maquinas.empty_form.nome }}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-secondary">Marca</label>
+            {{ formset_maquinas.empty_form.marca }}
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-maquina w-100" title="Remover">
+                <i class="bi bi-trash"></i> Remover
+            </button>
+        </div>
+    </div>
+    <div class="row g-2 mt-2">
+        <div class="col-md-3">
+            <label class="form-label small text-secondary">Modelo</label>
+            {{ formset_maquinas.empty_form.modelo }}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-secondary">Nº de Série</label>
+            {{ formset_maquinas.empty_form.numero_serie }}
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-secondary">Ano</label>
+            {{ formset_maquinas.empty_form.ano }}
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-secondary">Foto</label>
+            {{ formset_maquinas.empty_form.foto }}
+        </div>
+    </div>
+    <div class="mt-2">
+        <div class="form-check">
+            {{ formset_maquinas.empty_form.ativo }}
+            <label class="form-check-label small text-secondary" for="{{ formset_maquinas.empty_form.ativo.id_for_label }}">Ativo</label>
+        </div>
+    </div>
+</div>
+</script>
+<script>
+(function() {
+    const maquinasFormsetDiv = document.getElementById('maquinas-formset');
+    const addMaquinaBtn = document.getElementById('add-maquina-btn');
+    const maquinasTotalForms = maquinasFormsetDiv.querySelector('[name$="-TOTAL_FORMS"]');
+    const templateHtml = document.getElementById('maquina-template').innerHTML;
+
+    function getMaquinaNewIndex() {
+        return parseInt(maquinasTotalForms.value);
+    }
+
+    addMaquinaBtn.addEventListener('click', function() {
+        const idx = getMaquinaNewIndex();
+        const html = templateHtml.replace(/__prefix__/g, idx);
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        maquinasFormsetDiv.appendChild(div.firstElementChild);
+        maquinasTotalForms.value = parseInt(maquinasTotalForms.value) + 1;
+    });
+
+    maquinasFormsetDiv.addEventListener('click', function(e) {
+        const btn = e.target.closest('.remove-maquina');
+        if (!btn) return;
+        const form = btn.closest('.maquina-inline-form');
+        const deleteInput = form.querySelector('[name$="-DELETE"]');
+        if (deleteInput) {
+            deleteInput.checked = true;
+            form.style.display = 'none';
+        } else {
+            maquinasTotalForms.value = parseInt(maquinasTotalForms.value) - 1;
+            form.remove();
+        }
+    });
+})();
+</script>
+{% endblock %}

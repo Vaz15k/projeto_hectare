@@ -20,11 +20,52 @@
                             </div>
                         {% endif %}
 
-                        {% include "partials/form_field.html" with field=form.tecnico %}
-                        {% include "partials/form_field.html" with field=form.cliente %}
-                        {% include "partials/form_field.html" with field=form.tipo_servico %}
+                        <div class="row g-3">
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.tecnico %}</div>
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.cliente %}</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-secondary">
+                                        {{ form.maquinas.label }}
+                                        {% if form.maquinas.field.required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    <div class="dropdown w-100">
+                                        <button class="btn btn-outline-secondary dropdown-toggle form-control text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" id="maquinas-dropdown-btn">
+                                            <span id="maquinas-selecionadas-text">Nenhuma máquina selecionada</span>
+                                        </button>
+                                        <div class="dropdown-menu p-3" style="min-width: 100%; max-height: 250px; overflow-y: auto;" id="maquinas-dropdown">
+                                            {% for maq_obj in form.maquinas.field.queryset %}
+                                            <div class="form-check maquina-checkbox-item" data-cliente-id="{{ maq_obj.cliente_id }}">
+                                                <input class="form-check-input maquina-checkbox" type="checkbox"
+                                                    name="maquinas" value="{{ maq_obj.pk }}"
+                                                    id="id_maquinas_{{ forloop.counter0 }}"
+                                                    {% if maq_obj.pk in maquinas_selecionadas %}checked{% endif %}>
+                                                <label class="form-check-label" for="id_maquinas_{{ forloop.counter0 }}">{{ maq_obj.nome }}</label>
+                                            </div>
+                                            {% empty %}
+                                            <p class="text-muted small mb-0">Nenhuma máquina cadastrada.</p>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% if form.maquinas.help_text %}
+                                        <div class="form-text text-muted">{{ form.maquinas.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.maquinas.errors %}
+                                        <div class="invalid-feedback d-block">{% for e in form.maquinas.errors %}{{ e }}{% endfor %}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.tipo_servico %}</div>
+                        </div>
                         {% include "partials/form_field.html" with field=form.descricao %}
-                        {% include "partials/form_field.html" with field=form.pecas_utilizadas %}
+
+                        <hr class="my-4">
+                        <h5 class="text-primary mb-3"><i class="bi bi-wrench-adjustable"></i> Diagnóstico Técnico</h5>
+                        {% include "partials/form_field.html" with field=form.problema_relatado %}
+                        {% include "partials/form_field.html" with field=form.diagnostico %}
+                        {% include "partials/form_field.html" with field=form.solucao %}
 
                         <div class="row g-3">
                             <div class="col-md-6">{% include "partials/form_field.html" with field=form.data_inicio %}</div>
@@ -43,10 +84,69 @@
 
                         {% include "partials/form_field.html" with field=form.status %}
 
+                        {% if formset_pecas %}
+                        <hr class="my-4">
+                        <h5 class="text-primary mb-3"><i class="bi bi-box-seam"></i> Peças Utilizadas</h5>
+                        <p class="text-muted small">Registre cada peça utilizada com quantidade e valor unitário.</p>
+                        <div id="pecas-formset">
+                            {{ formset_pecas.management_form }}
+                            {% if formset_pecas.non_form_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in formset_pecas.non_form_errors %}
+                                <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% for peca_form in formset_pecas %}
+                            <div class="peca-form mb-3 p-3 border rounded position-relative">
+                                {% for hidden in peca_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                <div class="peca-row row g-2 align-items-end">
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-secondary">Peça</label>
+                                        {{ peca_form.nome }}
+                                        {% if peca_form.nome.errors %}
+                                        <div class="invalid-feedback d-block">{{ peca_form.nome.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small text-secondary">Qtd.</label>
+                                        {{ peca_form.quantidade }}
+                                        {% if peca_form.quantidade.errors %}
+                                        <div class="invalid-feedback d-block">{{ peca_form.quantidade.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-secondary">Valor Unit. (R$)</label>
+                                        {{ peca_form.valor_unitario }}
+                                        {% if peca_form.valor_unitario.errors %}
+                                        <div class="invalid-feedback d-block">{{ peca_form.valor_unitario.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small text-secondary">Subtotal</label>
+                                        <p class="form-control-plaintext font-monospace peca-subtotal-text mb-0">R$ 0.00</p>
+                                    </div>
+                                    <div class="col-md-1 d-flex align-items-end pb-1">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-peca" title="Remover">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% if peca_form.DELETE %}
+                                <div class="d-none">{{ peca_form.DELETE }}</div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" id="add-peca-btn" class="btn btn-outline-primary btn-sm mt-1">
+                            <i class="bi bi-plus-circle"></i> Adicionar peça
+                        </button>
+                        {% endif %}
+
                         {% if formset %}
                         <hr class="my-4">
                         <h5 class="text-primary mb-3"><i class="bi bi-cash-stack"></i> Gastos Extras</h5>
-                        <p class="text-muted small">Registre peças, ferramentas ou outros gastos adicionais.</p>
+                        <p class="text-muted small">Registre outros gastos adicionais (deslocamento, alimentação, ferramentas, etc.).</p>
                         <div id="gastos-extras-formset">
                             {{ formset.management_form }}
                             {% if formset.non_form_errors %}
@@ -60,7 +160,7 @@
                             <div class="gasto-extra-form mb-3 p-3 border rounded position-relative">
                                 {% for hidden in gasto_form.hidden_fields %}{{ hidden }}{% endfor %}
                                 <div class="gasto-extra-row row g-2 align-items-end">
-                                    <div class="col-md-6">
+                                    <div class="col-md-5">
                                         <label class="form-label small text-secondary">Descrição</label>
                                         {{ gasto_form.descricao }}
                                         {% if gasto_form.descricao.errors %}
@@ -74,8 +174,12 @@
                                         <div class="invalid-feedback d-block">{{ gasto_form.valor.errors }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-2 d-flex align-items-end pb-1">
-                                        <button type="button" class="btn btn-outline-danger btn-sm remove-gasto" title="Remover">
+                                    <div class="col-md-2">
+                                        <label class="form-label small text-secondary">&nbsp;</label>
+                                        <p class="form-control-plaintext font-monospace gasto-subtotal-text mb-0 small text-muted" style="visibility: hidden;">-</p>
+                                    </div>
+                                    <div class="col-md-1 d-flex align-items-end">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-gasto w-100" title="Remover">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
@@ -189,7 +293,7 @@
 <div class="gasto-extra-form mb-3 p-3 border rounded position-relative">
     {% for hidden in formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
     <div class="gasto-extra-row row g-2 align-items-end">
-        <div class="col-md-6">
+        <div class="col-md-5">
             <label class="form-label small text-secondary">Descrição</label>
             {{ formset.empty_form.descricao }}
         </div>
@@ -197,8 +301,12 @@
             <label class="form-label small text-secondary">Valor (R$)</label>
             {{ formset.empty_form.valor }}
         </div>
-        <div class="col-md-2 d-flex align-items-end pb-1">
-            <button type="button" class="btn btn-outline-danger btn-sm remove-gasto" title="Remover">
+        <div class="col-md-2">
+            <label class="form-label small text-secondary">&nbsp;</label>
+            <p class="form-control-plaintext font-monospace gasto-subtotal-text mb-0 small text-muted" style="visibility: hidden;">-</p>
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-gasto w-100" title="Remover">
                 <i class="bi bi-trash"></i>
             </button>
         </div>
@@ -212,7 +320,7 @@
     const totalForms = document.querySelector('[name$="-TOTAL_FORMS"]');
     const templateHtml = document.getElementById('gasto-extra-template').innerHTML;
 
-    function recalcularTotal() {
+    window.recalcularTotal = function() {
         const km = parseFloat(document.querySelector('[name$="km_rodado"]')?.value) || 0;
         const valKm = parseFloat(document.querySelector('[name$="valor_km"]')?.value) || 0;
         const horas = parseFloat(document.querySelector('[name$="hora_trabalhada"]')?.value) || 0;
@@ -227,12 +335,26 @@
             gastos += parseFloat(el.value) || 0;
         });
 
-        const total = subKm + subHora + gastos;
+        let pecasTotal = 0;
+        document.querySelectorAll('.peca-form').forEach(function(form) {
+            if (form.style.display === 'none') return;
+            const qtd = parseFloat(form.querySelector('.peca-qtd')?.value) || 0;
+            const valUnit = parseFloat(form.querySelector('.peca-valor')?.value) || 0;
+            const subtotal = qtd * valUnit;
+            const subtotalEl = form.querySelector('.peca-subtotal-text');
+            if (subtotalEl) {
+                subtotalEl.textContent = 'R$ ' + subtotal.toFixed(2);
+            }
+            pecasTotal += subtotal;
+        });
+
+        const total = subKm + subHora + gastos + pecasTotal;
         document.getElementById('preview-valor-total').textContent = 'R$ ' + total.toFixed(2);
 
         const detalhes = [];
         if (subKm > 0) detalhes.push('km: R$ ' + subKm.toFixed(2));
         if (subHora > 0) detalhes.push('hora: R$ ' + subHora.toFixed(2));
+        if (pecasTotal > 0) detalhes.push('peças: R$ ' + pecasTotal.toFixed(2));
         if (gastos > 0) detalhes.push('extras: R$ ' + gastos.toFixed(2));
         document.getElementById('preview-detalhes').textContent = detalhes.join(' | ');
     }
@@ -249,10 +371,10 @@
         return div.firstElementChild;
     }
 
-    function attachInputListeners() {
-        document.querySelectorAll('.gasto-valor, [name$="km_rodado"], [name$="valor_km"], [name$="hora_trabalhada"], [name$="valor_hora"]').forEach(function(el) {
-            el.removeEventListener('input', recalcularTotal);
-            el.addEventListener('input', recalcularTotal);
+    window.attachInputListeners = function() {
+        document.querySelectorAll('.gasto-valor, .peca-qtd, .peca-valor, [name$="km_rodado"], [name$="valor_km"], [name$="hora_trabalhada"], [name$="valor_hora"]').forEach(function(el) {
+            el.removeEventListener('input', window.recalcularTotal);
+            el.addEventListener('input', window.recalcularTotal);
         });
     }
 
@@ -260,8 +382,8 @@
         const form = createEmptyForm();
         formsetDiv.appendChild(form);
         totalForms.value = parseInt(totalForms.value) + 1;
-        attachInputListeners();
-        recalcularTotal();
+        window.attachInputListeners();
+        window.recalcularTotal();
     });
 
     formsetDiv.addEventListener('click', function(e) {
@@ -276,11 +398,85 @@
             totalForms.value = parseInt(totalForms.value) - 1;
             form.remove();
         }
-        recalcularTotal();
+        window.recalcularTotal();
     });
 
-    attachInputListeners();
-    recalcularTotal();
+    window.attachInputListeners();
+    window.recalcularTotal();
+})();
+</script>
+{% endif %}
+
+{% if formset_pecas %}
+<script type="template/html" id="peca-template">
+<div class="peca-form mb-3 p-3 border rounded position-relative">
+    {% for hidden in formset_pecas.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="peca-row row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small text-secondary">Peça</label>
+            {{ formset_pecas.empty_form.nome }}
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-secondary">Qtd.</label>
+            {{ formset_pecas.empty_form.quantidade }}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-secondary">Valor Unit. (R$)</label>
+            {{ formset_pecas.empty_form.valor_unitario }}
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-secondary">Subtotal</label>
+            <p class="form-control-plaintext font-monospace peca-subtotal-text mb-0">R$ 0.00</p>
+        </div>
+        <div class="col-md-1 d-flex align-items-end pb-1">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-peca" title="Remover">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    </div>
+</div>
+</script>
+<script>
+(function() {
+    const pecasFormsetDiv = document.getElementById('pecas-formset');
+    const addPecaBtn = document.getElementById('add-peca-btn');
+    const pecasTotalForms = pecasFormsetDiv.querySelector('[name$="-TOTAL_FORMS"]');
+    const templateHtml = document.getElementById('peca-template').innerHTML;
+
+    function getPecaNewIndex() {
+        return parseInt(pecasTotalForms.value);
+    }
+
+    function createPecaForm() {
+        const idx = getPecaNewIndex();
+        const html = templateHtml.replace(/__prefix__/g, idx);
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        return div.firstElementChild;
+    }
+
+    addPecaBtn.addEventListener('click', function() {
+        const form = createPecaForm();
+        pecasFormsetDiv.appendChild(form);
+        pecasTotalForms.value = parseInt(pecasTotalForms.value) + 1;
+        window.attachInputListeners();
+        window.recalcularTotal();
+    });
+
+    pecasFormsetDiv.addEventListener('click', function(e) {
+        const btn = e.target.closest('.remove-peca');
+        if (!btn) return;
+        const form = btn.closest('.peca-form');
+        const deleteInput = form.querySelector('[name$="-DELETE"]');
+        if (deleteInput) {
+            deleteInput.checked = true;
+            form.style.display = 'none';
+        } else {
+            pecasTotalForms.value = parseInt(pecasTotalForms.value) - 1;
+            form.remove();
+        }
+        window.recalcularTotal();
+    });
 })();
 </script>
 {% endif %}
@@ -384,4 +580,56 @@
 })();
 </script>
 {% endif %}
+
+<script>
+// Dropdown de máquinas com filtro por cliente selecionado
+(function() {
+    const checkboxes = document.querySelectorAll('.maquina-checkbox');
+    const btnText = document.getElementById('maquinas-selecionadas-text');
+    const dropdown = document.getElementById('maquinas-dropdown');
+    const clienteSelect = document.querySelector('[name="cliente"]');
+
+    if (!checkboxes.length || !btnText) return;
+
+    function atualizarTexto() {
+        const selecionadas = [];
+        checkboxes.forEach(function(cb) {
+            if (cb.checked) {
+                const item = cb.closest('.maquina-checkbox-item');
+                const label = item?.querySelector('.form-check-label');
+                if (label) selecionadas.push(label.textContent.trim());
+            }
+        });
+        btnText.textContent = selecionadas.length ? selecionadas.join(', ') : 'Nenhuma máquina selecionada';
+    }
+
+    function filtrarMaquinas() {
+        const clienteId = clienteSelect?.value || '';
+        document.querySelectorAll('.maquina-checkbox-item').forEach(function(item) {
+            if (!clienteId) {
+                item.style.display = '';
+            } else {
+                const maqClienteId = item.getAttribute('data-cliente-id');
+                item.style.display = (maqClienteId === clienteId) ? '' : 'none';
+            }
+        });
+    }
+
+    checkboxes.forEach(function(cb) {
+        cb.addEventListener('change', atualizarTexto);
+    });
+
+    if (clienteSelect) {
+        clienteSelect.addEventListener('change', filtrarMaquinas);
+        filtrarMaquinas();
+    }
+
+    // Evita que clicar nos checkboxes feche o dropdown
+    dropdown.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+
+    atualizarTexto();
+})();
+</script>
 {% endblock %}

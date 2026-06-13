@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra, AnexoServico, Configuracao
+from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra, AnexoServico, Configuracao, PecaUtilizada, Maquina
 
 
 class TipoServicoForm(forms.ModelForm):
@@ -32,14 +32,25 @@ class EmpregadoForm(forms.ModelForm):
 
 
 class ServicoForm(forms.ModelForm):
+    maquinas = forms.ModelMultipleChoiceField(
+        queryset=Maquina.objects.filter(ativo=True),
+        required=False,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input maquina-checkbox"}),
+        label="Máquinas Atendidas",
+        help_text="Selecione uma ou mais máquinas do cliente",
+    )
+
     class Meta:
         model = Servico
         fields = [
             "tecnico",
             "cliente",
             "tipo_servico",
+            "maquinas",
             "descricao",
-            "pecas_utilizadas",
+            "problema_relatado",
+            "diagnostico",
+            "solucao",
             "data_inicio",
             "data_conclusao",
             "km_rodado",
@@ -53,9 +64,9 @@ class ServicoForm(forms.ModelForm):
             "cliente": forms.Select(attrs={"class": "form-control"}),
             "tipo_servico": forms.Select(attrs={"class": "form-control"}),
             "descricao": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-            "pecas_utilizadas": forms.Textarea(
-                attrs={"class": "form-control", "rows": 3}
-            ),
+            "problema_relatado": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "diagnostico": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "solucao": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "data_inicio": forms.DateTimeInput(
                 attrs={"class": "form-control", "type": "datetime-local"},
                 format="%Y-%m-%dT%H:%M",
@@ -140,6 +151,54 @@ class AnexoServicoForm(forms.ModelForm):
 AnexoServicoFormSet = inlineformset_factory(
     Servico, AnexoServico, form=AnexoServicoForm,
     extra=1, can_delete=True,
+)
+
+
+class PecaUtilizadaForm(forms.ModelForm):
+    class Meta:
+        model = PecaUtilizada
+        fields = ["nome", "quantidade", "valor_unitario"]
+        widgets = {
+            "nome": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: Rolamento 6205"}),
+            "quantidade": forms.NumberInput(attrs={"class": "form-control peca-qtd", "placeholder": "1"}),
+            "valor_unitario": forms.NumberInput(attrs={"class": "form-control peca-valor", "placeholder": "0.00"}),
+        }
+
+
+PecaUtilizadaFormSet = inlineformset_factory(
+    Servico, PecaUtilizada, form=PecaUtilizadaForm,
+    extra=1, can_delete=True,
+)
+
+
+class MaquinaForm(forms.ModelForm):
+    class Meta:
+        model = Maquina
+        fields = ["nome", "marca", "modelo", "numero_serie", "ano", "foto", "ativo"]
+        widgets = {
+            "nome": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: Trator Massey Ferguson"}),
+            "marca": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: John Deere"}),
+            "modelo": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: MF 290"}),
+            "numero_serie": forms.TextInput(attrs={"class": "form-control", "placeholder": "Número de série"}),
+            "ano": forms.NumberInput(attrs={"class": "form-control", "placeholder": "Ex: 2020"}),
+            "foto": forms.ClearableFileInput(attrs={"class": "form-control form-control-sm"}),
+            "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+
+MaquinaInlineFormSet = inlineformset_factory(
+    Cliente, Maquina, form=MaquinaForm,
+    extra=1, can_delete=True,
+    fields=["nome", "marca", "modelo", "numero_serie", "ano", "foto", "ativo"],
+    widgets={
+        "nome": forms.TextInput(attrs={"class": "form-control form-control-sm", "placeholder": "Ex: Trator Massey Ferguson"}),
+        "marca": forms.TextInput(attrs={"class": "form-control form-control-sm", "placeholder": "Ex: John Deere"}),
+        "modelo": forms.TextInput(attrs={"class": "form-control form-control-sm", "placeholder": "Ex: MF 290"}),
+        "numero_serie": forms.TextInput(attrs={"class": "form-control form-control-sm", "placeholder": "Nº de série"}),
+        "ano": forms.NumberInput(attrs={"class": "form-control form-control-sm", "placeholder": "Ex: 2020"}),
+        "foto": forms.ClearableFileInput(attrs={"class": "form-control form-control-sm"}),
+        "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    },
 )
 
 

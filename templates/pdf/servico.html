@@ -258,10 +258,38 @@
     </div>
     {% endif %}
 
-    {% if servico.pecas_utilizadas %}
+    {% if maquinas %}
     <div class="secao">
-        <div class="secao-titulo">Peças Utilizadas</div>
-        <div class="campo-valor">{{ servico.pecas_utilizadas|linebreaksbr }}</div>
+        <div class="secao-titulo">Máquinas Atendidas</div>
+        {% for maquina in maquinas %}
+        <div class="campo">
+            <span class="campo-valor"><strong>{{ maquina.nome }}</strong></span>
+            {% if maquina.modelo %}<span class="campo-valor"> — Modelo: {{ maquina.modelo }}</span>{% endif %}
+            {% if maquina.numero_serie %}<span class="campo-valor"> — Nº Série: {{ maquina.numero_serie }}</span>{% endif %}
+            {% if maquina.ano %}<span class="campo-valor"> — Ano: {{ maquina.ano }}</span>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if servico.problema_relatado %}
+    <div class="secao">
+        <div class="secao-titulo">Problema Relatado</div>
+        <div class="campo-valor">{{ servico.problema_relatado|linebreaksbr }}</div>
+    </div>
+    {% endif %}
+
+    {% if servico.diagnostico %}
+    <div class="secao">
+        <div class="secao-titulo">Diagnóstico</div>
+        <div class="campo-valor">{{ servico.diagnostico|linebreaksbr }}</div>
+    </div>
+    {% endif %}
+
+    {% if servico.solucao %}
+    <div class="secao">
+        <div class="secao-titulo">Solução</div>
+        <div class="campo-valor">{{ servico.solucao|linebreaksbr }}</div>
     </div>
     {% endif %}
 
@@ -289,6 +317,15 @@
                     <td>{{ servico.hora_trabalhada }}h x R$ {{ servico.valor_hora|floatformat:2 }}</td>
                     <td class="valor-coluna">R$ {{ valor_hora_total|floatformat:2 }}</td>
                 </tr>
+                {% endif %}
+                {% if pecas %}
+                {% for peca in pecas %}
+                <tr>
+                    <td>{{ peca.nome }} (x{{ peca.quantidade }})</td>
+                    <td>{{ peca.quantidade }} x R$ {{ peca.valor_unitario|floatformat:2 }}</td>
+                    <td class="valor-coluna">R$ {{ peca.valor_total|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
                 {% endif %}
                 {% if gastos %}
                 {% for gasto in gastos %}

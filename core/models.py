@@ -30,6 +30,26 @@ class Cliente(models.Model):
     def __str__(self):
         return self.nome
 
+
+def renomear_foto_maquina(instance, filename):
+    import uuid
+    ext = filename.split('.')[-1]
+    return f"maquinas/{instance.cliente.pk}/{uuid.uuid4().hex[:8]}.{ext}"
+
+
+class Maquina(models.Model):
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='maquinas')
+    nome = models.CharField(max_length=200, verbose_name="Nome da Máquina")
+    marca = models.CharField(max_length=100, blank=True, null=True, verbose_name="Marca")
+    modelo = models.CharField(max_length=100, blank=True, null=True)
+    numero_serie = models.CharField(max_length=100, blank=True, null=True, verbose_name="Nº de Série")
+    ano = models.IntegerField(blank=True, null=True)
+    foto = models.ImageField(upload_to=renomear_foto_maquina, blank=True, null=True, verbose_name="Foto da Máquina")
+    ativo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nome
+
 class TipoServico(models.Model):
     nome = models.CharField(max_length=100)
     descricao = models.TextField(blank=True, null=True)
@@ -63,8 +83,13 @@ class Servico(models.Model):
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='servicos')
     tipo_servico = models.ForeignKey(TipoServico, on_delete=models.PROTECT, related_name='servicos_tipo')
-    descricao = models.TextField(blank=True, null=True)
-    pecas_utilizadas = models.TextField(blank=True, null=True, verbose_name="Peças Utilizadas(Registro)")
+    maquinas = models.ManyToManyField('Maquina', blank=True, related_name='servicos')
+
+    descricao = models.TextField(blank=True, null=True, verbose_name="Descrição do Serviço")
+
+    problema_relatado = models.TextField(blank=True, null=True, verbose_name="Problema Relatado", help_text="O que o cliente relatou como problema")
+    diagnostico = models.TextField(blank=True, null=True, verbose_name="Diagnóstico", help_text="Causa do problema identificada pelo técnico")
+    solucao = models.TextField(blank=True, null=True, verbose_name="Solução", help_text="O que foi feito para resolver")
 
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_inicio = models.DateTimeField(blank=True, null=True)
@@ -85,6 +110,7 @@ class Servico(models.Model):
         from django.db.models.query import QuerySet
         gastos_extras: QuerySet['GastoExtra']
         anexos: QuerySet['AnexoServico']
+        pecas: QuerySet['PecaUtilizada']
 
     def __str__(self):
         return f"{self.tipo_servico.nome} - {self.cliente.nome}"
@@ -142,6 +168,21 @@ class GastoExtra(models.Model):
 
     def __str__(self):
         return f"{self.descricao}: R$ {self.valor}"
+
+
+class PecaUtilizada(models.Model):
+    servico = models.ForeignKey(Servico, on_delete=models.CASCADE, related_name='pecas')
+    nome = models.CharField(max_length=200, verbose_name="Nome da Peça")
+    quantidade = models.PositiveIntegerField(default=1, verbose_name="Qtd.")
+    valor_unitario = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor Unitário (R$)")
+    valor_total = models.DecimalField(max_digits=10, decimal_places=2, editable=False, verbose_name="Valor Total")
+
+    def save(self, *args, **kwargs):
+        self.valor_total = self.quantidade * self.valor_unitario
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.nome} x{self.quantidade} — R$ {self.valor_total}"
 
 
 class NotaFiscal(models.Model):

@@ -12,8 +12,8 @@ from django.http import HttpResponse
 
 from xhtml2pdf import pisa
 
-from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra, Configuracao
-from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet, AnexoServicoFormSet, ConfiguracaoForm
+from .models import Servico, Cliente, Empregado, TipoServico, GastoExtra, Configuracao, PecaUtilizada, Maquina
+from .forms import ClienteForm, ServicoForm, EmpregadoForm, TipoServicoForm, GastoExtraFormSet, AnexoServicoFormSet, ConfiguracaoForm, PecaUtilizadaFormSet, MaquinaInlineFormSet
 
 
 def _build_filtro_ctx(request):
@@ -296,28 +296,44 @@ def criar_servico(request):
     if request.method == "POST":
         form = ServicoForm(request.POST)
         formset = GastoExtraFormSet(request.POST)
+        formset_pecas = PecaUtilizadaFormSet(request.POST)
         formset_anexos = AnexoServicoFormSet(request.POST, request.FILES)
         if form.is_valid():
             servico = form.save()
             formset = GastoExtraFormSet(request.POST, instance=servico)
+            formset_pecas = PecaUtilizadaFormSet(request.POST, instance=servico)
             formset_anexos = AnexoServicoFormSet(request.POST, request.FILES, instance=servico)
-            if formset.is_valid() and formset_anexos.is_valid():
+            if formset.is_valid() and formset_pecas.is_valid() and formset_anexos.is_valid():
                 formset.save()
+                formset_pecas.save()
                 formset_anexos.save()
-                servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
+                servico.valor_total = (
+                    servico.calcular_valor_total()
+                    + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
+                    + sum(p.valor_total for p in PecaUtilizada.objects.filter(servico=servico))
+                )
                 servico.save(update_fields=["valor_total"])
             return redirect("home")
     else:
         form = ServicoForm()
         formset = GastoExtraFormSet()
+        formset_pecas = PecaUtilizadaFormSet()
         formset_anexos = AnexoServicoFormSet()
+
+    if request.method == "POST":
+        maquinas_selecionadas = set(int(pk) for pk in request.POST.getlist("maquinas") if pk)
+    else:
+        maquinas_selecionadas = set(form.initial.get("maquinas", Maquina.objects.none()).values_list("pk", flat=True))
+
     return render(
         request,
         "formulario_servico.html",
         {
             "form": form,
             "formset": formset,
+            "formset_pecas": formset_pecas,
             "formset_anexos": formset_anexos,
+            "maquinas_selecionadas": maquinas_selecionadas,
             "titulo": "Novo Serviço",
             "rota_cancelar": "listar_servicos",
             "url_voltar": "listar_servicos",
@@ -330,26 +346,39 @@ def editar_servico(request, pk):
     if request.method == "POST":
         form = ServicoForm(request.POST, instance=servico)
         formset = GastoExtraFormSet(request.POST, instance=servico)
+        formset_pecas = PecaUtilizadaFormSet(request.POST, instance=servico)
         formset_anexos = AnexoServicoFormSet(request.POST, request.FILES, instance=servico)
-        if form.is_valid() and formset.is_valid() and formset_anexos.is_valid():
+        if form.is_valid() and formset.is_valid() and formset_pecas.is_valid() and formset_anexos.is_valid():
             form.save()
             formset.save()
+            formset_pecas.save()
             formset_anexos.save()
-            servico.valor_total = servico.calcular_valor_total() + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
+            servico.valor_total = (
+                servico.calcular_valor_total()
+                + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
+                + sum(p.valor_total for p in PecaUtilizada.objects.filter(servico=servico))
+            )
             servico.save(update_fields=["valor_total"])
             return redirect("listar_servicos")
     else:
         form = ServicoForm(instance=servico)
         formset = GastoExtraFormSet(instance=servico)
+        formset_pecas = PecaUtilizadaFormSet(instance=servico)
         formset_anexos = AnexoServicoFormSet(instance=servico)
 
+    if request.method == "POST":
+        maquinas_selecionadas = set(int(pk) for pk in request.POST.getlist("maquinas") if pk)
+    else:
+        maquinas_selecionadas = set(servico.maquinas.values_list("pk", flat=True))
     return render(
         request,
         "formulario_servico.html",
         {
             "form": form,
             "formset": formset,
+            "formset_pecas": formset_pecas,
             "formset_anexos": formset_anexos,
+            "maquinas_selecionadas": maquinas_selecionadas,
             "titulo": f"Editar Serviço #{servico.pk}",
             "rota_cancelar": "listar_servicos",
             "url_voltar": "listar_servicos",
@@ -379,6 +408,7 @@ def deletar_servico(request, pk):
 def detalhar_servico(request, pk):
     servico = get_object_or_404(Servico, pk=pk)
     gastos = servico.gastos_extras.all()
+    pecas = servico.pecas.all()
     anexos = servico.anexos.all()
     return render(
         request,
@@ -386,6 +416,7 @@ def detalhar_servico(request, pk):
         {
             "servico": servico,
             "gastos": gastos,
+            "pecas": pecas,
             "anexos": anexos,
             "titulo": f"Serviço #{servico.pk}",
         },
@@ -449,6 +480,27 @@ def editar_cliente(request, pk):
             "rota_cancelar": "listar_clientes",
             "url_voltar": "listar_clientes",
             "submit_label": "Atualizar",
+        },
+    )
+
+
+def maquinas_cliente(request, pk):
+    cliente = get_object_or_404(Cliente, pk=pk)
+    if request.method == "POST":
+        formset_maquinas = MaquinaInlineFormSet(request.POST, request.FILES, instance=cliente)
+        if formset_maquinas.is_valid():
+            formset_maquinas.save()
+            return redirect("listar_clientes")
+    else:
+        formset_maquinas = MaquinaInlineFormSet(instance=cliente)
+
+    return render(
+        request,
+        "maquinas_cliente.html",
+        {
+            "formset_maquinas": formset_maquinas,
+            "titulo": f"Máquinas de {cliente.nome}",
+            "cliente": cliente,
         },
     )
 
@@ -565,10 +617,12 @@ def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
 
 def exportar_servico_pdf(request, pk):
     servico = get_object_or_404(
-        Servico.objects.select_related('cliente', 'tecnico', 'tipo_servico'),
+        Servico.objects.select_related('cliente', 'tecnico', 'tipo_servico').prefetch_related('maquinas'),
         pk=pk
     )
     gastos = servico.gastos_extras.all()
+    pecas = servico.pecas.all()
+    maquinas = servico.maquinas.all()
     config = Configuracao.load()
 
     valor_km_total = Decimal('0.00')
@@ -577,6 +631,9 @@ def exportar_servico_pdf(request, pk):
         valor_km_total = servico.km_rodado * servico.valor_km
     if servico.hora_trabalhada and servico.valor_hora:
         valor_hora_total = servico.hora_trabalhada * servico.valor_hora
+
+    valor_pecas_total = sum(p.valor_total for p in pecas)
+    valor_gastos_total = sum(g.valor for g in gastos)
 
     logo_url = None
     if config.logo:
@@ -596,9 +653,13 @@ def exportar_servico_pdf(request, pk):
     html_string = render_to_string('pdf/servico.html', {
         'servico': servico,
         'gastos': gastos,
+        'pecas': pecas,
+        'maquinas': maquinas,
         'config': config,
         'valor_km_total': valor_km_total,
         'valor_hora_total': valor_hora_total,
+        'valor_pecas_total': valor_pecas_total,
+        'valor_gastos_total': valor_gastos_total,
         'data_geracao': timezone.now().strftime('%d/%m/%Y às %H:%M'),
         'logo_url': logo_url,
         'qrcode_path': qrcode_path,

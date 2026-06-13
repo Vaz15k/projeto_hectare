@@ -68,15 +68,59 @@
                             <p class="mb-0">{{ servico.descricao|linebreaksbr }}</p>
                         </div>
                         {% endif %}
-                        {% if servico.pecas_utilizadas %}
-                        <div class="col-12">
-                            <label class="form-label small text-secondary fw-bold">Peças Utilizadas</label>
-                            <p class="mb-0">{{ servico.pecas_utilizadas|linebreaksbr }}</p>
-                        </div>
-                        {% endif %}
                     </div>
                 </div>
             </div>
+
+            {% if servico.maquinas.exists %}
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0"><i class="bi bi-gear-wide-connected"></i> Máquinas Atendidas</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        {% for maquina in servico.maquinas.all %}
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <strong>{{ maquina.nome }}</strong>
+                                {% if maquina.modelo %}<br><small class="text-muted">Modelo: {{ maquina.modelo }}</small>{% endif %}
+                                {% if maquina.numero_serie %}<br><small class="text-muted">Nº Série: {{ maquina.numero_serie }}</small>{% endif %}
+                                {% if maquina.ano %}<br><small class="text-muted">Ano: {{ maquina.ano }}</small>{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if servico.problema_relatado or servico.diagnostico or servico.solucao %}
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0"><i class="bi bi-wrench-adjustable"></i> Diagnóstico Técnico</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% if servico.problema_relatado %}
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary fw-bold">Problema Relatado</label>
+                        <p class="mb-0">{{ servico.problema_relatado|linebreaksbr }}</p>
+                    </div>
+                    {% endif %}
+                    {% if servico.diagnostico %}
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary fw-bold">Diagnóstico</label>
+                        <p class="mb-0">{{ servico.diagnostico|linebreaksbr }}</p>
+                    </div>
+                    {% endif %}
+                    {% if servico.solucao %}
+                    <div>
+                        <label class="form-label small text-secondary fw-bold">Solução</label>
+                        <p class="mb-0">{{ servico.solucao|linebreaksbr }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
 
             <div class="card shadow border-0 mb-4">
                 <div class="card-header bg-white py-3 border-bottom">
@@ -118,6 +162,31 @@
                                 <tr>
                                     <td>{{ gasto.descricao }}</td>
                                     <td class="text-end font-monospace">R$ {{ gasto.valor }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pecas %}
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0"><i class="bi bi-box-seam"></i> Peças Utilizadas</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead><tr><th>Peça</th><th class="text-end">Qtd.</th><th class="text-end">Valor Unit.</th><th class="text-end">Subtotal</th></tr></thead>
+                            <tbody>
+                                {% for peca in pecas %}
+                                <tr>
+                                    <td>{{ peca.nome }}</td>
+                                    <td class="text-end">{{ peca.quantidade }}</td>
+                                    <td class="text-end font-monospace">R$ {{ peca.valor_unitario }}</td>
+                                    <td class="text-end font-monospace">R$ {{ peca.valor_total }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
