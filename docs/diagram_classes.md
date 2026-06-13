@@ -14,6 +14,16 @@ classDiagram
         +Boolean ativo
     }
 
+    class Maquina {
+        +String nome
+        +String marca
+        +String modelo
+        +String numero_serie
+        +Integer ano
+        +Image foto
+        +Boolean ativo
+    }
+
     class Empregado {
         +String nome
         +String cpf
@@ -27,7 +37,9 @@ classDiagram
 
     class Servico {
         +String descricao
-        +String pecas_utilizadas
+        +String problema_relatado
+        +String diagnostico
+        +String solucao
         +DateTime data_criacao
         +DateTime data_inicio
         +DateTime data_conclusao
@@ -38,6 +50,15 @@ classDiagram
         +Decimal valor_hora
         +Decimal valor_total
         +String status
+        +calcular_valor_total() Decimal
+        +save()
+    }
+
+    class PecaUtilizada {
+        +String nome
+        +Integer quantidade
+        +Decimal valor_unitario
+        +Decimal valor_total
         +save()
     }
 
@@ -49,16 +70,16 @@ classDiagram
         +is_video() Boolean
     }
 
+    class GastoExtra {
+        +String descricao
+        +Decimal valor
+    }
+
     class NotaFiscal {
         +String numero_nota_fiscal
         +Decimal valor_total
         +String descricao_nota
         +DateTime data_emissao
-    }
-
-    class GastoExtra {
-        +String descricao
-        +Decimal valor
     }
 
     class Configuracao {
@@ -80,10 +101,14 @@ classDiagram
         +gerar_imagem() Image
     }
 
+    Cliente "1" <-- "0..*" Maquina : possui
     Cliente "1" <-- "0..*" Servico : solicita
     Empregado "1" <-- "0..*" Servico : realiza (tecnico)
     TipoServico "1" <-- "0..*" Servico : categoriza
-    Servico "1" *-- "0..*" AnexoServico : contém
-    Servico "1" o-- "0..*" NotaFiscal : gera
+    Maquina "0..*" <--> "0..*" Servico : atendida em
+    Servico "1" *-- "0..*" PecaUtilizada : consome
+    Servico "1" *-- "0..*" AnexoServico : contem
     Servico "1" *-- "0..*" GastoExtra : possui
+    Servico "1" o-- "0..*" NotaFiscal : gera
     Configuracao "1" --> "0..*" QRCodePix : gera
+```
