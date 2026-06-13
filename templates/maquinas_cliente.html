@@ -61,12 +61,14 @@
                                         <label class="form-label small text-secondary">Ano</label>
                                         {{ maq_form.ano }}
                                     </div>
-                                    <div class="col-md-4">
+                                </div>
+                                <div class="row g-2 mt-2">
+                                    <div class="col-12">
                                         <label class="form-label small text-secondary">Foto</label>
                                         {% if maq_form.instance.pk and maq_form.instance.foto %}
-                                        <div class="mb-1">
-                                            <img src="{{ maq_form.instance.foto.url }}" style="max-height: 50px;" class="rounded" alt="Foto">
-                                            <small class="text-muted ms-1">Atual</small>
+                                        <div class="mb-2">
+                                            <img src="{{ maq_form.instance.foto.url }}" style="max-height: 80px;" class="rounded border" alt="Foto">
+                                            <small class="text-muted ms-2">Atual</small>
                                         </div>
                                         {% endif %}
                                         {{ maq_form.foto }}
@@ -136,7 +138,9 @@
             <label class="form-label small text-secondary">Ano</label>
             {{ formset_maquinas.empty_form.ano }}
         </div>
-        <div class="col-md-4">
+    </div>
+    <div class="row g-2 mt-2">
+        <div class="col-12">
             <label class="form-label small text-secondary">Foto</label>
             {{ formset_maquinas.empty_form.foto }}
         </div>
