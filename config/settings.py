@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'authentication.apps.AuthenticationConfig',
     'core.apps.CoreConfig',
     'funcionarios.apps.FuncionariosConfig',
     'clientes.apps.ClientesConfig',
@@ -128,3 +129,15 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# ---------------------------------------------------------------------------
+# Autenticação — backend customizado + login obrigatório em todas as views
+# ---------------------------------------------------------------------------
+AUTHENTICATION_BACKENDS = [
+    'authentication.auth_backends.EmailOrUsernameBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'login'

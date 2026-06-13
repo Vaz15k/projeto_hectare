@@ -1,8 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
 from funcionarios.models import Empregado
 from funcionarios.forms import EmpregadoForm
 
 
+@login_required
 def criar_empregado(request):
     if request.method == "POST":
         form = EmpregadoForm(request.POST)
@@ -23,6 +25,7 @@ def criar_empregado(request):
     )
 
 
+@login_required
 def listar_empregados(request):
     empregados = Empregado.objects.all().order_by("nome")
     return render(
@@ -38,6 +41,7 @@ def listar_empregados(request):
     )
 
 
+@login_required
 def editar_empregado(request, pk):
     empregado = get_object_or_404(Empregado, pk=pk)
     if request.method == "POST":

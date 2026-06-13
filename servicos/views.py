@@ -9,6 +9,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.template.loader import render_to_string
 from django.http import HttpResponse
+from django.contrib.auth.decorators import login_required
 
 from xhtml2pdf import pisa
 
@@ -74,6 +75,7 @@ def _build_filtro_ctx(request):
 # Dashboard
 # ---------------------------------------------------------------------------
 
+@login_required
 def home(request):
     hoje = timezone.now()
     primeiro_dia_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -160,6 +162,7 @@ def home(request):
 # Tipo de Serviço
 # ---------------------------------------------------------------------------
 
+@login_required
 def criar_tipo_servico(request):
     if request.method == "POST":
         form = TipoServicoForm(request.POST)
@@ -179,6 +182,7 @@ def criar_tipo_servico(request):
     )
 
 
+@login_required
 def listar_tipos_servico(request):
     tipos_servico = TipoServico.objects.all().order_by("nome")
     return render(
@@ -193,6 +197,7 @@ def listar_tipos_servico(request):
     )
 
 
+@login_required
 def editar_tipo_servico(request, pk):
     tipo_servico = get_object_or_404(TipoServico, pk=pk)
     if request.method == "POST":
@@ -219,6 +224,7 @@ def editar_tipo_servico(request, pk):
 # Serviço CRUD
 # ---------------------------------------------------------------------------
 
+@login_required
 def listar_servicos(request):
     from django.core.paginator import Paginator
 
@@ -243,6 +249,7 @@ def listar_servicos(request):
     )
 
 
+@login_required
 def criar_servico(request):
     if request.method == "POST":
         form = ServicoForm(request.POST)
@@ -293,6 +300,7 @@ def criar_servico(request):
     )
 
 
+@login_required
 def editar_servico(request, pk):
     servico = get_object_or_404(Servico, pk=pk)
     if request.method == "POST":
@@ -339,6 +347,7 @@ def editar_servico(request, pk):
     )
 
 
+@login_required
 def deletar_servico(request, pk):
     """Exibe confirmação e remove o serviço após POST."""
     servico = get_object_or_404(Servico, pk=pk)
@@ -356,6 +365,7 @@ def deletar_servico(request, pk):
     )
 
 
+@login_required
 def detalhar_servico(request, pk):
     servico = get_object_or_404(Servico, pk=pk)
     gastos = servico.gastos_extras.all()
@@ -459,6 +469,7 @@ def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
     return temp_path
 
 
+@login_required
 def exportar_servico_pdf(request, pk):
     servico = get_object_or_404(
         Servico.objects.select_related('cliente', 'tecnico', 'tipo_servico')

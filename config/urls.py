@@ -22,6 +22,7 @@ from servicos.views import home
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('auth/', include('authentication.urls')),
 
     path('', home, name='home'),
     path('servicos/', include('servicos.urls')),

@@ -1,8 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
 from clientes.models import Cliente
 from clientes.forms import ClienteForm, MaquinaInlineFormSet
 
 
+@login_required
 def listar_clientes(request):
     clientes = Cliente.objects.all().order_by("nome")
     return render(
@@ -18,6 +20,7 @@ def listar_clientes(request):
     )
 
 
+@login_required
 def criar_cliente(request):
     if request.method == "POST":
         form = ClienteForm(request.POST)
@@ -38,6 +41,7 @@ def criar_cliente(request):
     )
 
 
+@login_required
 def editar_cliente(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk)
     if request.method == "POST":
@@ -61,6 +65,7 @@ def editar_cliente(request, pk):
     )
 
 
+@login_required
 def maquinas_cliente(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk)
     if request.method == "POST":
