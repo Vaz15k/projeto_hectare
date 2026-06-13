@@ -95,7 +95,7 @@ class GastoExtraForm(forms.ModelForm):
 
 GastoExtraFormSet = inlineformset_factory(
     Servico, GastoExtra, form=GastoExtraForm,
-    extra=1, can_delete=True,
+    extra=0, can_delete=True,
 )
 
 
@@ -150,7 +150,7 @@ class AnexoServicoForm(forms.ModelForm):
 
 AnexoServicoFormSet = inlineformset_factory(
     Servico, AnexoServico, form=AnexoServicoForm,
-    extra=1, can_delete=True,
+    extra=0, can_delete=True,
 )
 
 
@@ -167,7 +167,7 @@ class PecaUtilizadaForm(forms.ModelForm):
 
 PecaUtilizadaFormSet = inlineformset_factory(
     Servico, PecaUtilizada, form=PecaUtilizadaForm,
-    extra=1, can_delete=True,
+    extra=0, can_delete=True,
 )
 
 
@@ -188,7 +188,7 @@ class MaquinaForm(forms.ModelForm):
 
 MaquinaInlineFormSet = inlineformset_factory(
     Cliente, Maquina, form=MaquinaForm,
-    extra=1, can_delete=True,
+    extra=0, can_delete=True,
     fields=["nome", "marca", "modelo", "numero_serie", "ano", "foto", "ativo"],
     widgets={
         "nome": forms.TextInput(attrs={"class": "form-control form-control-sm", "placeholder": "Ex: Trator Massey Ferguson"}),
