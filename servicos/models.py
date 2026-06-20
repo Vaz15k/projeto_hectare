@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from django.db import models
 from django.core.validators import FileExtensionValidator
 
+from utils.file_utils import validar_tamanho_arquivo
 from clientes.models import Cliente, Maquina
 from funcionarios.models import Empregado
 
@@ -125,9 +126,12 @@ class AnexoServico(models.Model):
     servico = models.ForeignKey(Servico, on_delete=models.CASCADE, related_name='anexos')
     arquivo = models.FileField(
         upload_to=renomear_anexo, verbose_name="Anexo",
-        validators=[FileExtensionValidator(
-            allowed_extensions=['pdf', 'jpg', 'jpeg', 'png', 'mp4', 'mov', 'avi']
-        )]
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=['pdf', 'jpg', 'jpeg', 'png', 'mp4', 'mov', 'avi']
+            ),
+            validar_tamanho_arquivo,
+        ]
     )
     descricao = models.TextField(blank=True, null=True)
     data_upload = models.DateTimeField(auto_now_add=True)

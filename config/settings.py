@@ -175,3 +175,7 @@ if not DEBUG:
 
     # Frame options
     X_FRAME_OPTIONS = 'DENY'
+
+    # File upload limits
+    DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+    FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB

@@ -1,5 +1,7 @@
 from django.db import models
 
+from utils.file_utils import validar_tamanho_arquivo
+
 
 class Cliente(models.Model):
     nome = models.CharField(max_length=100)
@@ -38,7 +40,8 @@ class Maquina(models.Model):
     )
     ano = models.IntegerField(blank=True, null=True)
     foto = models.ImageField(
-        upload_to=renomear_foto_maquina, blank=True, null=True, verbose_name="Foto da Máquina"
+        upload_to=renomear_foto_maquina, blank=True, null=True, verbose_name="Foto da Máquina",
+        validators=[validar_tamanho_arquivo]
     )
     ativo = models.BooleanField(default=True)
 

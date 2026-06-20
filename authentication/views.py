@@ -31,6 +31,22 @@ def login_view(request):
     return render(request, "login.html", {"form": form})
 
 
+def ratelimited_view(request, exception):
+    """View amigável quando o rate-limit é atingido."""
+    return render(
+        request,
+        "login.html",
+        {
+            "form": LoginForm(request=request),
+            "ratelimited": True,
+            "ratelimit_msg": (
+                "Muitas tentativas de login. Por segurança, aguarde 1 minuto "
+                "antes de tentar novamente."
+            ),
+        },
+    )
+
+
 def logout_view(request):
     """View de logout do sistema."""
     auth_logout(request)

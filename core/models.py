@@ -1,5 +1,7 @@
 from django.db import models
 
+from utils.file_utils import validar_tamanho_arquivo
+
 
 def renomear_logo(instance, filename):
     ext = filename.split('.')[-1]
@@ -21,7 +23,10 @@ class Configuracao(models.Model):
     telefone = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
 
-    logo = models.ImageField(upload_to=renomear_logo, blank=True, verbose_name="Logo")
+    logo = models.ImageField(
+        upload_to=renomear_logo, blank=True, verbose_name="Logo",
+        validators=[validar_tamanho_arquivo]
+    )
 
     texto_cabecalho = models.TextField(
         blank=True, verbose_name="Texto do Cabeçalho (PDF)",
