@@ -4,3 +4,4 @@ pillow
 xhtml2pdf
 qrcode
 crcmod
+python-dotenv
