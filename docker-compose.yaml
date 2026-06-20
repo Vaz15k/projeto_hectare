@@ -2,16 +2,18 @@ services:
   db:
     image: postgres:18.1-alpine
     environment:
-      POSTGRES_USER: vazz
-      POSTGRES_PASSWORD: 20042012
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-postgres}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   web:
     build: .
+    env_file:
+      - .env
     environment:
       - DB_HOST=db
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"

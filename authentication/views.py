@@ -1,5 +1,6 @@
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.shortcuts import render, redirect
+from django.utils.http import url_has_allowed_host_and_scheme
 from authentication.forms import LoginForm
 
 
@@ -17,6 +18,12 @@ def login_view(request):
         if form.is_valid():
             auth_login(request, form.get_user())
             next_url = request.GET.get("next", "home")
+            if not url_has_allowed_host_and_scheme(
+                url=next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                next_url = "home"
             return redirect(next_url)
 
     return render(request, "login.html", {"form": form})
