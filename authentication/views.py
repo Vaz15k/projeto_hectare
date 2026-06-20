@@ -1,9 +1,11 @@
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.shortcuts import render, redirect
 from django.utils.http import url_has_allowed_host_and_scheme
+from django_ratelimit.decorators import ratelimit
 from authentication.forms import LoginForm
 
 
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def login_view(request):
     """
     View de login do sistema.

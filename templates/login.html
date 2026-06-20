@@ -164,7 +164,12 @@
             <p>Acesso restrito a funcionários</p>
         </div>
 
-        {% if form.non_field_errors %}
+        {% if ratelimited %}
+            <div class="alert alert-warning">
+                <i class="bi bi-shield-lock me-2"></i>
+                {{ ratelimit_msg }}
+            </div>
+        {% elif form.non_field_errors %}
             <div class="alert alert-danger">
                 {% for error in form.non_field_errors %}
                     {{ error }}

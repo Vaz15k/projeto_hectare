@@ -146,6 +146,8 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 
+RATELIMIT_VIEW = 'authentication.views.ratelimited_view'
+
 
 # ---------------------------------------------------------------------------
 # Production security settings
