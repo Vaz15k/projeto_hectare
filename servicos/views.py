@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncMonth
 from django.shortcuts import render, redirect, get_object_or_404
@@ -224,6 +225,27 @@ def editar_tipo_servico(request, pk):
 # Serviço CRUD
 # ---------------------------------------------------------------------------
 
+def _salvar_servico_com_relacionamentos(
+    form,
+    formset,
+    formset_pecas,
+    formset_anexos,
+):
+    """Salva o serviço e seus relacionamentos em uma única transação."""
+    with transaction.atomic():
+        servico = form.save()
+        formset.save()
+        formset_pecas.save()
+        formset_anexos.save()
+        servico.valor_total = (
+            servico.calcular_valor_total()
+            + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
+            + sum(p.valor_total for p in PecaUtilizada.objects.filter(servico=servico))
+        )
+        servico.save(update_fields=["valor_total"])
+    return servico
+
+
 @login_required
 def listar_servicos(request):
     from django.core.paginator import Paginator
@@ -253,24 +275,27 @@ def listar_servicos(request):
 def criar_servico(request):
     if request.method == "POST":
         form = ServicoForm(request.POST)
-        formset = GastoExtraFormSet(request.POST)
-        formset_pecas = PecaUtilizadaFormSet(request.POST)
-        formset_anexos = AnexoServicoFormSet(request.POST, request.FILES)
-        if form.is_valid():
-            servico = form.save()
-            formset = GastoExtraFormSet(request.POST, instance=servico)
-            formset_pecas = PecaUtilizadaFormSet(request.POST, instance=servico)
-            formset_anexos = AnexoServicoFormSet(request.POST, request.FILES, instance=servico)
-            if formset.is_valid() and formset_pecas.is_valid() and formset_anexos.is_valid():
-                formset.save()
-                formset_pecas.save()
-                formset_anexos.save()
-                servico.valor_total = (
-                    servico.calcular_valor_total()
-                    + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
-                    + sum(p.valor_total for p in PecaUtilizada.objects.filter(servico=servico))
-                )
-                servico.save(update_fields=["valor_total"])
+        formset = GastoExtraFormSet(request.POST, instance=form.instance)
+        formset_pecas = PecaUtilizadaFormSet(request.POST, instance=form.instance)
+        formset_anexos = AnexoServicoFormSet(
+            request.POST,
+            request.FILES,
+            instance=form.instance,
+        )
+
+        form_is_valid = form.is_valid()
+        formsets_are_valid = all([
+            formset.is_valid(),
+            formset_pecas.is_valid(),
+            formset_anexos.is_valid(),
+        ])
+        if form_is_valid and formsets_are_valid:
+            _salvar_servico_com_relacionamentos(
+                form,
+                formset,
+                formset_pecas,
+                formset_anexos,
+            )
             return redirect("home")
     else:
         form = ServicoForm()
@@ -308,17 +333,20 @@ def editar_servico(request, pk):
         formset = GastoExtraFormSet(request.POST, instance=servico)
         formset_pecas = PecaUtilizadaFormSet(request.POST, instance=servico)
         formset_anexos = AnexoServicoFormSet(request.POST, request.FILES, instance=servico)
-        if form.is_valid() and formset.is_valid() and formset_pecas.is_valid() and formset_anexos.is_valid():
-            form.save()
-            formset.save()
-            formset_pecas.save()
-            formset_anexos.save()
-            servico.valor_total = (
-                servico.calcular_valor_total()
-                + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
-                + sum(p.valor_total for p in PecaUtilizada.objects.filter(servico=servico))
+
+        form_is_valid = form.is_valid()
+        formsets_are_valid = all([
+            formset.is_valid(),
+            formset_pecas.is_valid(),
+            formset_anexos.is_valid(),
+        ])
+        if form_is_valid and formsets_are_valid:
+            _salvar_servico_com_relacionamentos(
+                form,
+                formset,
+                formset_pecas,
+                formset_anexos,
             )
-            servico.save(update_fields=["valor_total"])
             return redirect("listar_servicos")
     else:
         form = ServicoForm(instance=servico)
