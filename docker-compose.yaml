@@ -47,7 +47,6 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - static_data:/srv/static:ro
-      - media_data:/srv/media:ro
     depends_on:
       web:
         condition: service_started
