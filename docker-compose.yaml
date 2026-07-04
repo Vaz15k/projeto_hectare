@@ -17,12 +17,32 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  redis:
+    image: redis:8.8.0-alpine
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 64mb
+      - --maxmemory-policy
+      - noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   web:
     build: .
     env_file:
       - .env
     environment:
       DB_HOST: db
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/1}
     init: true
     expose:
       - "8000"
@@ -31,6 +51,8 @@ services:
       - media_data:/app/media
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

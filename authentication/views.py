@@ -1,11 +1,36 @@
 from django.contrib.auth import login as auth_login, logout as auth_logout
-from django.shortcuts import render, redirect
+from django.http import HttpRequest
+from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django_ratelimit.decorators import ratelimit
+
 from authentication.forms import LoginForm
 
 
-@ratelimit(key='ip', rate='5/m', method='POST', block=True)
+def client_ip(request: HttpRequest) -> str:
+    """Return the client IP supplied by Caddy, with a direct-request fallback."""
+    return request.META.get("HTTP_X_REAL_IP") or request.META["REMOTE_ADDR"]
+
+
+def login_account(_group: str, request: HttpRequest) -> str:
+    """Normalize the submitted login before using it as a rate-limit key."""
+    return request.POST.get("login", "").strip().casefold()
+
+
+@ratelimit(
+    group='login_ip',
+    key='ip',
+    rate='5/m',
+    method='POST',
+    block=True,
+)
+@ratelimit(
+    group='login_account',
+    key='authentication.views.login_account',
+    rate='5/m',
+    method='POST',
+    block=True,
+)
 def login_view(request):
     """
     View de login do sistema.
@@ -44,6 +69,7 @@ def ratelimited_view(request, exception):
                 "antes de tentar novamente."
             ),
         },
+        status=429,
     )
 
 

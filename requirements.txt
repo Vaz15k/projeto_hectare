@@ -7,3 +7,4 @@ qrcode
 crcmod
 python-dotenv
 django-ratelimit
+redis

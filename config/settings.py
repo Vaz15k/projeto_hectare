@@ -56,6 +56,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_ratelimit.middleware.RatelimitMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -89,6 +90,18 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD'),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
+    }
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': os.environ.get(
+            'REDIS_URL',
+            'redis://127.0.0.1:6379/1',
+        ),
+        'KEY_PREFIX': 'hectare',
+        'TIMEOUT': 300,
     }
 }
 
@@ -147,6 +160,9 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 
+RATELIMIT_USE_CACHE = 'default'
+RATELIMIT_FAIL_OPEN = False
+RATELIMIT_IP_META_KEY = 'authentication.views.client_ip'
 RATELIMIT_VIEW = 'authentication.views.ratelimited_view'
 
 
