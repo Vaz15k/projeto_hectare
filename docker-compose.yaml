@@ -24,12 +24,38 @@ services:
     environment:
       DB_HOST: db
     init: true
-    ports:
-      - "127.0.0.1:8000:8000"
+    expose:
+      - "8000"
+    volumes:
+      - static_data:/app/staticfiles
+      - media_data:/app/media
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2.11.4-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - static_data:/srv/static:ro
+      - media_data:/srv/media:ro
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  static_data:
+  media_data:
+  caddy_data:
+  caddy_config:

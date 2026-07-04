@@ -1,0 +1,17 @@
+{$SITE_ADDRESS:localhost} {
+	encode zstd gzip
+
+	handle_path /static/* {
+		root * /srv/static
+		file_server
+	}
+
+	handle_path /media/* {
+		root * /srv/media
+		file_server
+	}
+
+	handle {
+		reverse_proxy web:8000
+	}
+}
