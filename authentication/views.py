@@ -2,6 +2,7 @@ from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.http import HttpRequest
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 from django_ratelimit.decorators import ratelimit
 
 from authentication.forms import LoginForm
@@ -88,7 +89,12 @@ def ratelimited_view(request, exception):
     )
 
 
+@require_POST
 def logout_view(request):
-    """View de logout do sistema."""
+    """View de logout do sistema.
+
+    Aceita apenas POST (com CSRF) para impedir logout forçado por
+    requisições GET disparadas por sites externos.
+    """
     auth_logout(request)
     return redirect("login")
