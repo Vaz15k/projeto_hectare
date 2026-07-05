@@ -13,24 +13,39 @@ def client_ip(request: HttpRequest) -> str:
 
 
 def login_account(_group: str, request: HttpRequest) -> str:
-    """Normalize the submitted login before using it as a rate-limit key."""
-    return request.POST.get("login", "").strip().casefold()
+    """Normalize the submitted login before using it as a rate-limit key.
+
+    O form principal envia o campo "login"; o form do Django Admin envia
+    "username". Ambos alimentam o mesmo contador por conta.
+    """
+    login = request.POST.get("login") or request.POST.get("username") or ""
+    return login.strip().casefold()
 
 
-@ratelimit(
-    group='login_ip',
-    key='ip',
-    rate='5/m',
-    method='POST',
-    block=True,
-)
-@ratelimit(
-    group='login_account',
-    key='authentication.views.login_account',
-    rate='5/m',
-    method='POST',
-    block=True,
-)
+def login_ratelimit(view):
+    """Aplica os limites de tentativas de login (por IP e por conta).
+
+    Usado tanto na tela de login principal quanto no login do Django Admin,
+    compartilhando os mesmos grupos para que os contadores sejam únicos.
+    """
+    view = ratelimit(
+        group='login_account',
+        key='authentication.views.login_account',
+        rate='5/m',
+        method='POST',
+        block=True,
+    )(view)
+    view = ratelimit(
+        group='login_ip',
+        key='ip',
+        rate='5/m',
+        method='POST',
+        block=True,
+    )(view)
+    return view
+
+
+@login_ratelimit
 def login_view(request):
     """
     View de login do sistema.

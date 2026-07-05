@@ -17,8 +17,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+from authentication.views import login_ratelimit
 from core.views import protected_media
 from servicos.views import home
+
+# O login do admin autentica contra a mesma base de usuários que a tela de
+# login principal; sem isto ele contornaria o rate limit de tentativas.
+admin.site.login = login_ratelimit(admin.site.login)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
