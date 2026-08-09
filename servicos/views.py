@@ -269,7 +269,9 @@ def listar_servicos(request):
     from django.core.paginator import Paginator
 
     filtro_ctx, aplicar_filtro = _build_filtro_ctx(request)
-    servicos = aplicar_filtro(Servico.objects.all()).order_by('-data_inicio')
+    servicos = aplicar_filtro(
+        Servico.objects.select_related('cliente', 'tecnico', 'tipo_servico')
+    ).order_by('-data_inicio')
 
     paginator = Paginator(servicos, 20)
     page_number = request.GET.get('page', 1)
