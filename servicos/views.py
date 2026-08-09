@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime
 from decimal import Decimal
 
@@ -455,15 +456,29 @@ def _link_callback(uri, rel):
     return path
 
 
+def _normalizar_chave_pix(chave, tipo):
+    """Formata a chave conforme o tipo cadastrado nas configurações.
+
+    O tipo não pode ser deduzido do tamanho: CPF e celular com DDD têm ambos
+    11 dígitos, e tratar um CPF como telefone gera uma chave inexistente.
+    """
+    chave = chave.strip()
+    digitos = re.sub(r'\D', '', chave)
+
+    if tipo in ('cpf', 'cnpj'):
+        return digitos
+    if tipo == 'telefone':
+        # 10/11 dígitos é número nacional (DDD + linha) e precisa do DDI.
+        if len(digitos) in (10, 11):
+            digitos = f"55{digitos}"
+        return f"+{digitos}"
+    return chave
+
+
 def _gerar_payload_pix(chave_pix, nome_beneficiario, cidade, valor, txid='***'):
     import crcmod
 
     valor_formatado = f"{float(valor):.2f}" if valor else "0.00"
-
-    if chave_pix.isdigit() and len(chave_pix) == 11:
-        chave_pix = f"+55{chave_pix}"
-    elif chave_pix.isdigit() and len(chave_pix) == 10:
-        chave_pix = f"+55{chave_pix}"
 
     payload = "000201"
 
@@ -543,7 +558,7 @@ def exportar_servico_pdf(request, pk):
     if config.chave_pix:
         cidade = config.endereco.split(',')[-1].strip() if config.endereco else '***'
         qrcode_path = _gerar_qrcode_pix(
-            config.chave_pix,
+            _normalizar_chave_pix(config.chave_pix, config.tipo_chave_pix),
             config.nome_empresa or '***',
             cidade,
             servico.valor_total,

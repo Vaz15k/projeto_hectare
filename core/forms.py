@@ -23,6 +23,15 @@ class ConfiguracaoForm(forms.ModelForm):
             "tipo_chave_pix": forms.Select(attrs={"class": "form-control"}),
         }
 
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("chave_pix") and not cleaned_data.get("tipo_chave_pix"):
+            self.add_error(
+                "tipo_chave_pix",
+                "Informe o tipo da chave — é ele que define como ela é montada no QR Code.",
+            )
+        return cleaned_data
+
     def clean_logo(self):
         logo = self.cleaned_data.get("logo")
         if self.data.get(self.add_prefix("logo-clear")):
