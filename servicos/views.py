@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import unicodedata
 from datetime import datetime
 from decimal import Decimal
 
@@ -475,27 +476,50 @@ def _normalizar_chave_pix(chave, tipo):
     return chave
 
 
+def _campo_emv(identificador, valor):
+    """Monta um campo do BR Code no formato EMV: id + tamanho + valor.
+
+    O tamanho é contado em bytes porque é assim que o app do banco lê o
+    payload, e sempre sobre o valor que realmente será emitido.
+    """
+    tamanho = len(valor.encode('utf-8'))
+    if tamanho > 99:
+        raise ValueError(
+            f"Campo {identificador} do Pix excede 99 bytes ({tamanho})."
+        )
+    return f"{identificador}{tamanho:02d}{valor}"
+
+
+def _texto_br_code(valor, limite):
+    """Prepara nome/cidade para o BR Code: sem acento, sem espaço duplicado.
+
+    Acento ocuparia mais de um byte e faria o tamanho declarado divergir do
+    conteúdo. O truncamento vem antes da medição, nunca depois.
+    """
+    ascii_puro = (
+        unicodedata.normalize('NFKD', valor)
+        .encode('ascii', 'ignore')
+        .decode('ascii')
+    )
+    return ' '.join(ascii_puro.split())[:limite]
+
+
 def _gerar_payload_pix(chave_pix, nome_beneficiario, cidade, valor, txid='***'):
     import crcmod
 
     valor_formatado = f"{float(valor):.2f}" if valor else "0.00"
 
+    merchant_info = "0014BR.GOV.BCB.PIX" + _campo_emv("01", chave_pix)
+
     payload = "000201"
-
-    gui = "0014BR.GOV.BCB.PIX"
-    chave = f"01{len(chave_pix):02d}{chave_pix}"
-    merchant_info = gui + chave
-    payload += f"26{len(merchant_info):02d}{merchant_info}"
-
+    payload += _campo_emv("26", merchant_info)
     payload += "52040000"
     payload += "5303986"
-    payload += f"54{len(valor_formatado):02d}{valor_formatado}"
+    payload += _campo_emv("54", valor_formatado)
     payload += "5802BR"
-    payload += f"59{len(nome_beneficiario):02d}{nome_beneficiario[:25]}"
-    payload += f"60{len(cidade):02d}{cidade[:15]}"
-
-    txid_block = f"05{len(txid):02d}{txid}"
-    payload += f"62{len(txid_block):02d}{txid_block}"
+    payload += _campo_emv("59", _texto_br_code(nome_beneficiario, 25))
+    payload += _campo_emv("60", _texto_br_code(cidade, 15))
+    payload += _campo_emv("62", _campo_emv("05", txid))
 
     payload_com_crc = payload + "6304"
 
