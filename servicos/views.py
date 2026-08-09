@@ -548,10 +548,13 @@ def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
 
     img = qr.make_image(fill_color="black", back_color="white")
 
-    temp_path = os.path.join(tempfile.gettempdir(), f'qrcode_pix_{txid}.png')
-    img.save(temp_path, 'PNG')
-
-    return temp_path
+    # Nome aleatório: o anterior era derivado da OS, então dois downloads
+    # simultâneos do mesmo serviço escreviam e apagavam o mesmo arquivo.
+    with tempfile.NamedTemporaryFile(
+        prefix='qrcode_pix_', suffix='.png', delete=False
+    ) as arquivo:
+        img.save(arquivo, 'PNG')
+        return arquivo.name
 
 
 @login_required
@@ -591,28 +594,31 @@ def exportar_servico_pdf(request, pk):
             txid=f'OS{servico.pk:04d}'
         )
 
-    html_string = render_to_string('pdf/servico.html', {
-        'servico': servico,
-        'gastos': gastos,
-        'pecas': pecas,
-        'maquinas': maquinas,
-        'config': config,
-        'valor_km_total': valor_km_total,
-        'valor_hora_total': valor_hora_total,
-        'valor_pecas_total': valor_pecas_total,
-        'valor_gastos_total': valor_gastos_total,
-        'data_geracao': timezone.now().strftime('%d/%m/%Y às %H:%M'),
-        'logo_url': logo_url,
-        'qrcode_path': qrcode_path,
-    })
-
     response = HttpResponse(content_type='application/pdf')
     filename = f"OS_{servico.cliente.nome.replace(' ', '_')}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
-    pisa.CreatePDF(html_string, dest=response, link_callback=_link_callback)
+    # O QR fica num arquivo temporário só para o xhtml2pdf conseguir lê-lo, e
+    # precisa sumir mesmo se a renderização estourar no meio.
+    try:
+        html_string = render_to_string('pdf/servico.html', {
+            'servico': servico,
+            'gastos': gastos,
+            'pecas': pecas,
+            'maquinas': maquinas,
+            'config': config,
+            'valor_km_total': valor_km_total,
+            'valor_hora_total': valor_hora_total,
+            'valor_pecas_total': valor_pecas_total,
+            'valor_gastos_total': valor_gastos_total,
+            'data_geracao': timezone.now().strftime('%d/%m/%Y às %H:%M'),
+            'logo_url': logo_url,
+            'qrcode_path': qrcode_path,
+        })
 
-    if qrcode_path and os.path.exists(qrcode_path):
-        os.remove(qrcode_path)
+        pisa.CreatePDF(html_string, dest=response, link_callback=_link_callback)
+    finally:
+        if qrcode_path and os.path.exists(qrcode_path):
+            os.remove(qrcode_path)
 
     return response
