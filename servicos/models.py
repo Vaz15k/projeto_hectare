@@ -1,7 +1,9 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from django.db import models
 from django.core.validators import FileExtensionValidator
+from django.utils import timezone
 
 from utils.file_utils import validar_tamanho_arquivo
 from clientes.models import Cliente, Maquina
@@ -21,15 +23,17 @@ class TipoServico(models.Model):
 
 def calcular_data_competencia(data_inicio):
     """
-    Calcula a data de competência como o primeiro dia do mês de `data_inicio`.
-    Se `data_inicio` for None, retorna o primeiro dia do mês atual.
+    Calcula a data de competência como o primeiro dia do mês de `data_inicio`,
+    à meia-noite no fuso configurado no projeto.
+    Se `data_inicio` for None, usa o mês atual.
     """
-    from datetime import datetime
     if data_inicio is None:
-        return datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    if isinstance(data_inicio, datetime):
-        return data_inicio.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    return datetime(data_inicio.year, data_inicio.month, 1)
+        data_inicio = timezone.localtime()
+    elif isinstance(data_inicio, datetime) and timezone.is_aware(data_inicio):
+        # Do banco a data volta em UTC. Sem converter para o fuso local, um
+        # serviço iniciado no fim do mês cairia na competência do mês seguinte.
+        data_inicio = timezone.localtime(data_inicio)
+    return timezone.make_aware(datetime(data_inicio.year, data_inicio.month, 1))
 
 
 class Servico(models.Model):
@@ -104,7 +108,7 @@ class Servico(models.Model):
         return total
 
     def save(self, *args, **kwargs):
-        if self.data_inicio and not self.data_competencia:
+        if self.data_inicio:
             self.data_competencia = calcular_data_competencia(self.data_inicio)
         update_fields = kwargs.get('update_fields')
         if update_fields is None or 'valor_total' not in update_fields:
