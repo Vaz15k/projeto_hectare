@@ -1,0 +1,10 @@
+django
+gunicorn
+psycopg2-binary
+pillow
+xhtml2pdf
+qrcode
+crcmod
+python-dotenv
+django-ratelimit
+redis
