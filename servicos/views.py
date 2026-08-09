@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 
 from django.db import transaction
@@ -133,9 +133,7 @@ def home(request):
     status_values = [status_counts.get(k, 0) for k, _ in Servico.STATUS_POS]
     status_colors = [color_map[k] for k, _ in Servico.STATUS_POS]
 
-    months = []
-    for i in range(5, -1, -1):
-        months.append((mes_ref - timedelta(days=i * 32)).replace(day=1))
+    months = [_deslocar_mes(mes_ref, -i) for i in range(5, -1, -1)]
 
     revenue_qs = aplicar_filtro(Servico.objects.all(), excluir_mes=True)
     revenue_data = revenue_qs.filter(
