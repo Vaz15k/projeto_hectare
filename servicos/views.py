@@ -73,13 +73,28 @@ def _build_filtro_ctx(request):
 
 
 # ---------------------------------------------------------------------------
+# Períodos
+# ---------------------------------------------------------------------------
+
+def _inicio_do_mes(ano, mes):
+    """Meia-noite do dia 1 do mês informado, no fuso configurado no projeto."""
+    return timezone.make_aware(datetime(ano, mes, 1))
+
+
+def _deslocar_mes(referencia, meses):
+    """Início do mês deslocado `meses` a partir de `referencia`."""
+    total = referencia.year * 12 + referencia.month - 1 + meses
+    return _inicio_do_mes(total // 12, total % 12 + 1)
+
+
+# ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------
 
 @login_required
 def home(request):
-    hoje = timezone.now()
-    primeiro_dia_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    hoje = timezone.localtime()
+    primeiro_dia_mes = _inicio_do_mes(hoje.year, hoje.month)
 
     filtro_ctx, aplicar_filtro = _build_filtro_ctx(request)
     base = aplicar_filtro(Servico.objects.all())
@@ -88,15 +103,18 @@ def home(request):
     if filtro_ctx['mes_selecionado']:
         try:
             y, m = map(int, filtro_ctx['mes_selecionado'].split('-'))
-            mes_ref = datetime(y, m, 1, tzinfo=primeiro_dia_mes.tzinfo)
+            mes_ref = _inicio_do_mes(y, m)
         except (ValueError, TypeError):
             pass
 
     servicos_em_andamento = base.filter(status='EM_ANDAMENTO').count()
 
+    # Intervalo em vez de igualdade: `data_competencia` é gravada à meia-noite
+    # do fuso local e nunca casava com um instante montado em UTC.
     faturamento_mes = base.filter(
         status='CONCLUIDO',
-        data_competencia=mes_ref,
+        data_competencia__gte=mes_ref,
+        data_competencia__lt=_deslocar_mes(mes_ref, 1),
     ).aggregate(total=Sum('valor_total'))['total'] or 0
 
     clientes_base = Cliente.objects.all()
