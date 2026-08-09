@@ -1,6 +1,8 @@
 import json
 import os
-from datetime import datetime, timedelta
+import re
+import unicodedata
+from datetime import datetime
 from decimal import Decimal
 
 from django.db import transaction
@@ -73,13 +75,28 @@ def _build_filtro_ctx(request):
 
 
 # ---------------------------------------------------------------------------
+# Períodos
+# ---------------------------------------------------------------------------
+
+def _inicio_do_mes(ano, mes):
+    """Meia-noite do dia 1 do mês informado, no fuso configurado no projeto."""
+    return timezone.make_aware(datetime(ano, mes, 1))
+
+
+def _deslocar_mes(referencia, meses):
+    """Início do mês deslocado `meses` a partir de `referencia`."""
+    total = referencia.year * 12 + referencia.month - 1 + meses
+    return _inicio_do_mes(total // 12, total % 12 + 1)
+
+
+# ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------
 
 @login_required
 def home(request):
-    hoje = timezone.now()
-    primeiro_dia_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    hoje = timezone.localtime()
+    primeiro_dia_mes = _inicio_do_mes(hoje.year, hoje.month)
 
     filtro_ctx, aplicar_filtro = _build_filtro_ctx(request)
     base = aplicar_filtro(Servico.objects.all())
@@ -88,15 +105,18 @@ def home(request):
     if filtro_ctx['mes_selecionado']:
         try:
             y, m = map(int, filtro_ctx['mes_selecionado'].split('-'))
-            mes_ref = datetime(y, m, 1, tzinfo=primeiro_dia_mes.tzinfo)
+            mes_ref = _inicio_do_mes(y, m)
         except (ValueError, TypeError):
             pass
 
     servicos_em_andamento = base.filter(status='EM_ANDAMENTO').count()
 
+    # Intervalo em vez de igualdade: `data_competencia` é gravada à meia-noite
+    # do fuso local e nunca casava com um instante montado em UTC.
     faturamento_mes = base.filter(
         status='CONCLUIDO',
-        data_competencia=mes_ref,
+        data_competencia__gte=mes_ref,
+        data_competencia__lt=_deslocar_mes(mes_ref, 1),
     ).aggregate(total=Sum('valor_total'))['total'] or 0
 
     clientes_base = Cliente.objects.all()
@@ -115,9 +135,7 @@ def home(request):
     status_values = [status_counts.get(k, 0) for k, _ in Servico.STATUS_POS]
     status_colors = [color_map[k] for k, _ in Servico.STATUS_POS]
 
-    months = []
-    for i in range(5, -1, -1):
-        months.append((mes_ref - timedelta(days=i * 32)).replace(day=1))
+    months = [_deslocar_mes(mes_ref, -i) for i in range(5, -1, -1)]
 
     revenue_qs = aplicar_filtro(Servico.objects.all(), excluir_mes=True)
     revenue_data = revenue_qs.filter(
@@ -251,7 +269,9 @@ def listar_servicos(request):
     from django.core.paginator import Paginator
 
     filtro_ctx, aplicar_filtro = _build_filtro_ctx(request)
-    servicos = aplicar_filtro(Servico.objects.all()).order_by('-data_inicio')
+    servicos = aplicar_filtro(
+        Servico.objects.select_related('cliente', 'tecnico', 'tipo_servico')
+    ).order_by('-data_inicio')
 
     paginator = Paginator(servicos, 20)
     page_number = request.GET.get('page', 1)
@@ -439,32 +459,69 @@ def _link_callback(uri, rel):
     return path
 
 
+def _normalizar_chave_pix(chave, tipo):
+    """Formata a chave conforme o tipo cadastrado nas configurações.
+
+    O tipo não pode ser deduzido do tamanho: CPF e celular com DDD têm ambos
+    11 dígitos, e tratar um CPF como telefone gera uma chave inexistente.
+    """
+    chave = chave.strip()
+    digitos = re.sub(r'\D', '', chave)
+
+    if tipo in ('cpf', 'cnpj'):
+        return digitos
+    if tipo == 'telefone':
+        # 10/11 dígitos é número nacional (DDD + linha) e precisa do DDI.
+        if len(digitos) in (10, 11):
+            digitos = f"55{digitos}"
+        return f"+{digitos}"
+    return chave
+
+
+def _campo_emv(identificador, valor):
+    """Monta um campo do BR Code no formato EMV: id + tamanho + valor.
+
+    O tamanho é contado em bytes porque é assim que o app do banco lê o
+    payload, e sempre sobre o valor que realmente será emitido.
+    """
+    tamanho = len(valor.encode('utf-8'))
+    if tamanho > 99:
+        raise ValueError(
+            f"Campo {identificador} do Pix excede 99 bytes ({tamanho})."
+        )
+    return f"{identificador}{tamanho:02d}{valor}"
+
+
+def _texto_br_code(valor, limite):
+    """Prepara nome/cidade para o BR Code: sem acento, sem espaço duplicado.
+
+    Acento ocuparia mais de um byte e faria o tamanho declarado divergir do
+    conteúdo. O truncamento vem antes da medição, nunca depois.
+    """
+    ascii_puro = (
+        unicodedata.normalize('NFKD', valor)
+        .encode('ascii', 'ignore')
+        .decode('ascii')
+    )
+    return ' '.join(ascii_puro.split())[:limite]
+
+
 def _gerar_payload_pix(chave_pix, nome_beneficiario, cidade, valor, txid='***'):
     import crcmod
 
     valor_formatado = f"{float(valor):.2f}" if valor else "0.00"
 
-    if chave_pix.isdigit() and len(chave_pix) == 11:
-        chave_pix = f"+55{chave_pix}"
-    elif chave_pix.isdigit() and len(chave_pix) == 10:
-        chave_pix = f"+55{chave_pix}"
+    merchant_info = "0014BR.GOV.BCB.PIX" + _campo_emv("01", chave_pix)
 
     payload = "000201"
-
-    gui = "0014BR.GOV.BCB.PIX"
-    chave = f"01{len(chave_pix):02d}{chave_pix}"
-    merchant_info = gui + chave
-    payload += f"26{len(merchant_info):02d}{merchant_info}"
-
+    payload += _campo_emv("26", merchant_info)
     payload += "52040000"
     payload += "5303986"
-    payload += f"54{len(valor_formatado):02d}{valor_formatado}"
+    payload += _campo_emv("54", valor_formatado)
     payload += "5802BR"
-    payload += f"59{len(nome_beneficiario):02d}{nome_beneficiario[:25]}"
-    payload += f"60{len(cidade):02d}{cidade[:15]}"
-
-    txid_block = f"05{len(txid):02d}{txid}"
-    payload += f"62{len(txid_block):02d}{txid_block}"
+    payload += _campo_emv("59", _texto_br_code(nome_beneficiario, 25))
+    payload += _campo_emv("60", _texto_br_code(cidade, 15))
+    payload += _campo_emv("62", _campo_emv("05", txid))
 
     payload_com_crc = payload + "6304"
 
@@ -491,10 +548,13 @@ def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
 
     img = qr.make_image(fill_color="black", back_color="white")
 
-    temp_path = os.path.join(tempfile.gettempdir(), f'qrcode_pix_{txid}.png')
-    img.save(temp_path, 'PNG')
-
-    return temp_path
+    # Nome aleatório: o anterior era derivado da OS, então dois downloads
+    # simultâneos do mesmo serviço escreviam e apagavam o mesmo arquivo.
+    with tempfile.NamedTemporaryFile(
+        prefix='qrcode_pix_', suffix='.png', delete=False
+    ) as arquivo:
+        img.save(arquivo, 'PNG')
+        return arquivo.name
 
 
 @login_required
@@ -527,35 +587,38 @@ def exportar_servico_pdf(request, pk):
     if config.chave_pix:
         cidade = config.endereco.split(',')[-1].strip() if config.endereco else '***'
         qrcode_path = _gerar_qrcode_pix(
-            config.chave_pix,
+            _normalizar_chave_pix(config.chave_pix, config.tipo_chave_pix),
             config.nome_empresa or '***',
             cidade,
             servico.valor_total,
             txid=f'OS{servico.pk:04d}'
         )
 
-    html_string = render_to_string('pdf/servico.html', {
-        'servico': servico,
-        'gastos': gastos,
-        'pecas': pecas,
-        'maquinas': maquinas,
-        'config': config,
-        'valor_km_total': valor_km_total,
-        'valor_hora_total': valor_hora_total,
-        'valor_pecas_total': valor_pecas_total,
-        'valor_gastos_total': valor_gastos_total,
-        'data_geracao': timezone.now().strftime('%d/%m/%Y às %H:%M'),
-        'logo_url': logo_url,
-        'qrcode_path': qrcode_path,
-    })
-
     response = HttpResponse(content_type='application/pdf')
     filename = f"OS_{servico.cliente.nome.replace(' ', '_')}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
-    pisa.CreatePDF(html_string, dest=response, link_callback=_link_callback)
+    # O QR fica num arquivo temporário só para o xhtml2pdf conseguir lê-lo, e
+    # precisa sumir mesmo se a renderização estourar no meio.
+    try:
+        html_string = render_to_string('pdf/servico.html', {
+            'servico': servico,
+            'gastos': gastos,
+            'pecas': pecas,
+            'maquinas': maquinas,
+            'config': config,
+            'valor_km_total': valor_km_total,
+            'valor_hora_total': valor_hora_total,
+            'valor_pecas_total': valor_pecas_total,
+            'valor_gastos_total': valor_gastos_total,
+            'data_geracao': timezone.localtime().strftime('%d/%m/%Y às %H:%M'),
+            'logo_url': logo_url,
+            'qrcode_path': qrcode_path,
+        })
 
-    if qrcode_path and os.path.exists(qrcode_path):
-        os.remove(qrcode_path)
+        pisa.CreatePDF(html_string, dest=response, link_callback=_link_callback)
+    finally:
+        if qrcode_path and os.path.exists(qrcode_path):
+            os.remove(qrcode_path)
 
     return response

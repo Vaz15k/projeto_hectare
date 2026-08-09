@@ -55,6 +55,27 @@ class ServicoForm(forms.ModelForm):
             "status": forms.Select(attrs={"class": "form-control"}),
         }
 
+    def clean(self):
+        """Impede vincular máquina de outro cliente ao serviço.
+
+        A tela lista todas as máquinas ativas e esconde as de outros clientes
+        via JavaScript, o que não vale como validação: um POST direto passaria.
+        """
+        cleaned_data = super().clean()
+        cliente = cleaned_data.get("cliente")
+        maquinas = cleaned_data.get("maquinas")
+
+        if cliente and maquinas:
+            de_outro_cliente = [m.nome for m in maquinas if m.cliente_id != cliente.pk]
+            if de_outro_cliente:
+                self.add_error(
+                    "maquinas",
+                    "Estas máquinas não pertencem ao cliente selecionado: "
+                    + ", ".join(de_outro_cliente),
+                )
+
+        return cleaned_data
+
 
 class GastoExtraForm(forms.ModelForm):
     class Meta:
