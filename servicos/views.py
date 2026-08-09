@@ -611,7 +611,7 @@ def exportar_servico_pdf(request, pk):
             'valor_hora_total': valor_hora_total,
             'valor_pecas_total': valor_pecas_total,
             'valor_gastos_total': valor_gastos_total,
-            'data_geracao': timezone.now().strftime('%d/%m/%Y às %H:%M'),
+            'data_geracao': timezone.localtime().strftime('%d/%m/%Y às %H:%M'),
             'logo_url': logo_url,
             'qrcode_path': qrcode_path,
         })
