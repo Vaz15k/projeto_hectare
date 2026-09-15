@@ -8,3 +8,5 @@ crcmod
 python-dotenv
 django-ratelimit
 redis
+pytest
+pytest-django
