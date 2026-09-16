@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from django.forms import BaseInlineFormSet, inlineformset_factory
 from servicos.models import Servico, TipoServico, ServicoTipo, GastoExtra, AnexoServico, PecaUtilizada
@@ -31,6 +33,7 @@ class ServicoForm(forms.ModelForm):
             "descricao", "problema_relatado", "diagnostico", "solucao",
             "data_inicio", "data_conclusao",
             "km_rodado", "valor_km", "hora_trabalhada", "valor_hora",
+            "tipo_desconto", "desconto",
             "status",
         ]
         widgets = {
@@ -52,8 +55,17 @@ class ServicoForm(forms.ModelForm):
             "valor_km": forms.NumberInput(attrs={"class": "form-control"}),
             "hora_trabalhada": forms.NumberInput(attrs={"class": "form-control"}),
             "valor_hora": forms.NumberInput(attrs={"class": "form-control"}),
+            "tipo_desconto": forms.Select(attrs={"class": "form-control"}),
+            "desconto": forms.NumberInput(attrs={
+                "class": "form-control", "min": "0", "step": "0.01",
+            }),
             "status": forms.Select(attrs={"class": "form-control"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tipo_desconto'].required = False
+        self.fields['desconto'].required = False
 
     def clean(self):
         """Impede vincular máquina de outro cliente ao serviço.
@@ -73,6 +85,22 @@ class ServicoForm(forms.ModelForm):
                     "Estas máquinas não pertencem ao cliente selecionado: "
                     + ", ".join(de_outro_cliente),
                 )
+
+        tipo = cleaned_data.get('tipo_desconto') or 'NENHUM'
+        desconto = cleaned_data.get('desconto')
+        cleaned_data['tipo_desconto'] = tipo
+        if desconto is None:
+            if tipo == 'NENHUM':
+                desconto = Decimal('0.00')
+                cleaned_data['desconto'] = desconto
+            else:
+                self.add_error('desconto', 'Informe o valor do desconto.')
+        if tipo == 'PERCENTUAL' and desconto is not None and desconto > Decimal('100'):
+            self.add_error('desconto', 'O desconto percentual não pode passar de 100%.')
+        if tipo == 'NENHUM' and desconto:
+            self.add_error('desconto', 'Selecione um tipo de desconto para aplicar este valor.')
+        if tipo in ('PERCENTUAL', 'VALOR') and desconto == 0:
+            self.add_error('desconto', 'Informe um valor maior que zero para o desconto.')
 
         return cleaned_data
 

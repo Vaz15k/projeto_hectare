@@ -257,13 +257,42 @@ def _salvar_servico_com_relacionamentos(
         formset.save()
         formset_pecas.save()
         formset_anexos.save()
-        servico.valor_total = (
-            servico.calcular_valor_total()
+        subtotal = (
+            servico.calcular_subtotal()
             + sum(g.valor for g in GastoExtra.objects.filter(servico=servico))
             + sum(p.valor_total for p in PecaUtilizada.objects.filter(servico=servico))
         )
+        servico.valor_total = servico.calcular_valor_total(subtotal)
         servico.save(update_fields=["valor_total"])
     return servico
+
+
+def _validar_desconto_valor_fixo(form, formset, formset_pecas, formset_tipos):
+    if form.cleaned_data.get('tipo_desconto') != 'VALOR':
+        return True
+
+    dados = form.cleaned_data
+    subtotal = ((dados.get('km_rodado') or 0) * (dados.get('valor_km') or 0)
+                + (dados.get('hora_trabalhada') or 0) * (dados.get('valor_hora') or 0))
+    subtotal += sum(
+        item.cleaned_data['valor_aplicado']
+        for item in formset_tipos.forms
+        if item.cleaned_data.get('tipo_servico') and not item.cleaned_data.get('DELETE')
+    )
+    subtotal += sum(
+        item.cleaned_data['valor']
+        for item in formset.forms
+        if item.cleaned_data.get('descricao') and not item.cleaned_data.get('DELETE')
+    )
+    subtotal += sum(
+        item.cleaned_data['quantidade'] * item.cleaned_data['valor_unitario']
+        for item in formset_pecas.forms
+        if item.cleaned_data.get('nome') and not item.cleaned_data.get('DELETE')
+    )
+    if dados['desconto'] > subtotal:
+        form.add_error('desconto', 'O desconto em reais não pode passar do subtotal da OS.')
+        return False
+    return True
 
 
 @login_required
@@ -313,7 +342,8 @@ def criar_servico(request):
             formset_anexos.is_valid(),
             formset_tipos.is_valid(),
         ])
-        if form_is_valid and formsets_are_valid:
+        if (form_is_valid and formsets_are_valid
+                and _validar_desconto_valor_fixo(form, formset, formset_pecas, formset_tipos)):
             _salvar_servico_com_relacionamentos(
                 form,
                 formset,
@@ -369,7 +399,8 @@ def editar_servico(request, pk):
             formset_anexos.is_valid(),
             formset_tipos.is_valid(),
         ])
-        if form_is_valid and formsets_are_valid:
+        if (form_is_valid and formsets_are_valid
+                and _validar_desconto_valor_fixo(form, formset, formset_pecas, formset_tipos)):
             _salvar_servico_com_relacionamentos(
                 form,
                 formset,
@@ -433,6 +464,9 @@ def detalhar_servico(request, pk):
     gastos = servico.gastos_extras.all()
     pecas = servico.pecas.all()
     anexos = servico.anexos.all()
+    subtotal = (servico.calcular_subtotal()
+                + sum(g.valor for g in gastos)
+                + sum(p.valor_total for p in pecas))
     return render(
         request, "detalhar_servico.html",
         {
@@ -440,6 +474,8 @@ def detalhar_servico(request, pk):
             "gastos": gastos,
             "pecas": pecas,
             "anexos": anexos,
+            "subtotal": subtotal,
+            "desconto_aplicado": servico.calcular_desconto(subtotal),
             "titulo": f"Serviço #{servico.pk}",
         },
     )
@@ -593,6 +629,7 @@ def exportar_servico_pdf(request, pk):
 
     valor_pecas_total = sum(p.valor_total for p in pecas)
     valor_gastos_total = sum(g.valor for g in gastos)
+    subtotal = servico.calcular_subtotal() + valor_pecas_total + valor_gastos_total
 
     logo_url = None
     if config.logo:
@@ -626,6 +663,8 @@ def exportar_servico_pdf(request, pk):
             'valor_hora_total': valor_hora_total,
             'valor_pecas_total': valor_pecas_total,
             'valor_gastos_total': valor_gastos_total,
+            'subtotal': subtotal,
+            'desconto_aplicado': servico.calcular_desconto(subtotal),
             'data_geracao': timezone.localtime().strftime('%d/%m/%Y às %H:%M'),
             'logo_url': logo_url,
             'qrcode_path': qrcode_path,

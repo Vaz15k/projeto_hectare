@@ -1,5 +1,5 @@
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import TYPE_CHECKING
 from django.db import models
 from django.core.validators import FileExtensionValidator
@@ -44,6 +44,11 @@ def calcular_data_competencia(data_inicio):
 
 
 class Servico(models.Model):
+    TIPOS_DESCONTO = [
+        ('NENHUM', 'Sem desconto'),
+        ('PERCENTUAL', 'Porcentagem (%)'),
+        ('VALOR', 'Valor fixo (R$)'),
+    ]
     STATUS_POS = [
         ('ORCAMENTO', 'Orçamento'),
         ('AGENDADO', 'Agendado'),
@@ -88,6 +93,15 @@ class Servico(models.Model):
     valor_km = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     hora_trabalhada = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     valor_hora = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    tipo_desconto = models.CharField(
+        max_length=10, choices=TIPOS_DESCONTO, default='NENHUM',
+        verbose_name='Tipo de desconto',
+    )
+    desconto = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Desconto (%) ou (R$)',
+    )
 
     valor_total = models.DecimalField(
         max_digits=10, decimal_places=2, blank=True, null=True, editable=False
@@ -107,7 +121,7 @@ class Servico(models.Model):
     def __str__(self):
         return f"OS #{self.pk} - {self.cliente.nome}"
 
-    def calcular_valor_total(self):
+    def calcular_subtotal(self):
         total = Decimal('0.00')
         if self.km_rodado and self.valor_km:
             total += self.km_rodado * self.valor_km
@@ -116,6 +130,20 @@ class Servico(models.Model):
         if self.pk:
             total += sum(item.valor_aplicado for item in self.itens_servico.all())
         return total
+
+    def calcular_desconto(self, subtotal):
+        if self.tipo_desconto == 'PERCENTUAL':
+            valor = subtotal * self.desconto / Decimal('100')
+        elif self.tipo_desconto == 'VALOR':
+            valor = self.desconto
+        else:
+            valor = Decimal('0.00')
+        return min(subtotal, valor.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+
+    def calcular_valor_total(self, subtotal=None):
+        if subtotal is None:
+            subtotal = self.calcular_subtotal()
+        return subtotal - self.calcular_desconto(subtotal)
 
     def save(self, *args, **kwargs):
         if self.data_inicio:

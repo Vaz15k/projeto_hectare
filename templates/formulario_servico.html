@@ -226,7 +226,18 @@
                         <button type="button" id="add-gasto-btn" class="btn btn-outline-primary btn-sm mt-1">
                             <i class="bi bi-plus-circle"></i> Adicionar gasto
                         </button>
+                        <div class="row g-3 mt-3">
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.tipo_desconto %}</div>
+                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.desconto %}</div>
+                        </div>
+                        <p class="text-muted small">O desconto é aplicado sobre o subtotal da OS, incluindo serviços, horas, deslocamento, peças e gastos extras.</p>
                         <div class="mt-3 p-3 bg-light rounded">
+                            <div class="d-flex justify-content-between align-items-center small text-secondary mb-1">
+                                <span>Subtotal:</span><span id="preview-subtotal">R$ 0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center small text-secondary mb-2">
+                                <span>Desconto:</span><span id="preview-desconto">- R$ 0.00</span>
+                            </div>
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="fw-bold">Valor Total Estimado:</span>
                                 <span id="preview-valor-total" class="fs-5 font-monospace fw-bold text-success">R$ 0.00</span>
@@ -435,7 +446,15 @@
             if (form.style.display === 'none') return;
             tiposTotal += parseFloat(form.querySelector('.tipo-servico-valor')?.value) || 0;
         });
-        const total = subKm + subHora + tiposTotal + gastos + pecasTotal;
+        const subtotal = subKm + subHora + tiposTotal + gastos + pecasTotal;
+        const tipoDesconto = document.querySelector('[name="tipo_desconto"]')?.value;
+        const valorDesconto = parseFloat(document.querySelector('[name="desconto"]')?.value) || 0;
+        const desconto = tipoDesconto === 'PERCENTUAL'
+            ? Math.min(subtotal, Math.round(subtotal * valorDesconto) / 100)
+            : tipoDesconto === 'VALOR' ? Math.min(subtotal, valorDesconto) : 0;
+        const total = subtotal - desconto;
+        document.getElementById('preview-subtotal').textContent = 'R$ ' + subtotal.toFixed(2);
+        document.getElementById('preview-desconto').textContent = '- R$ ' + desconto.toFixed(2);
         document.getElementById('preview-valor-total').textContent = 'R$ ' + total.toFixed(2);
 
         const detalhes = [];
@@ -460,9 +479,11 @@
     }
 
     window.attachInputListeners = function() {
-        document.querySelectorAll('.gasto-valor, .peca-qtd, .peca-valor, .tipo-servico-valor, [name$="km_rodado"], [name$="valor_km"], [name$="hora_trabalhada"], [name$="valor_hora"]').forEach(function(el) {
+        document.querySelectorAll('.gasto-valor, .peca-qtd, .peca-valor, .tipo-servico-valor, [name$="km_rodado"], [name$="valor_km"], [name$="hora_trabalhada"], [name$="valor_hora"], [name="tipo_desconto"], [name="desconto"]').forEach(function(el) {
             el.removeEventListener('input', window.recalcularTotal);
             el.addEventListener('input', window.recalcularTotal);
+            el.removeEventListener('change', window.recalcularTotal);
+            el.addEventListener('change', window.recalcularTotal);
         });
     }
 
