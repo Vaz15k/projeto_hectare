@@ -223,8 +223,8 @@
                 <div class="secao">
                     <div class="secao-titulo">Dados do Serviço</div>
                     <div class="campo">
-                        <span class="campo-label">Tipo de Serviço:</span><br>
-                        <span class="campo-valor">{{ servico.tipo_servico.nome }}</span>
+                        <span class="campo-label">Serviços realizados:</span><br>
+                        <span class="campo-valor">{% for item in servico.itens_servico.all %}{{ item.tipo_servico.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
                     </div>
                     <div class="campo">
                         <span class="campo-label">Status:</span><br>

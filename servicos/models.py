@@ -51,8 +51,8 @@ class Servico(models.Model):
     cliente = models.ForeignKey(
         Cliente, on_delete=models.PROTECT, related_name='servicos'
     )
-    tipo_servico = models.ForeignKey(
-        TipoServico, on_delete=models.PROTECT, related_name='servicos_tipo'
+    tipos_servico = models.ManyToManyField(
+        TipoServico, through='ServicoTipo', related_name='servicos_tipo'
     )
     maquinas = models.ManyToManyField(
         Maquina, blank=True, related_name='servicos', db_table='core_servico_maquinas'
@@ -92,12 +92,13 @@ class Servico(models.Model):
         gastos_extras: QuerySet['GastoExtra']
         anexos: QuerySet['AnexoServico']
         pecas: QuerySet['PecaUtilizada']
+        itens_servico: QuerySet['ServicoTipo']
 
     class Meta:
         db_table = 'core_servico'
 
     def __str__(self):
-        return f"{self.tipo_servico.nome} - {self.cliente.nome}"
+        return f"OS #{self.pk} - {self.cliente.nome}"
 
     def calcular_valor_total(self):
         total = Decimal('0.00')
@@ -114,6 +115,22 @@ class Servico(models.Model):
         if update_fields is None or 'valor_total' not in update_fields:
             self.valor_total = self.calcular_valor_total()
         super().save(*args, **kwargs)
+
+
+class ServicoTipo(models.Model):
+    servico = models.ForeignKey(Servico, on_delete=models.CASCADE, related_name='itens_servico')
+    tipo_servico = models.ForeignKey(TipoServico, on_delete=models.PROTECT)
+    if TYPE_CHECKING:
+        servico_id: int
+
+    class Meta:
+        db_table = 'core_servicotipo'
+        constraints = [models.UniqueConstraint(
+            fields=['servico', 'tipo_servico'], name='servicotipo_unico_por_os'
+        )]
+
+    def __str__(self):
+        return f'{self.tipo_servico.nome} - OS #{self.servico_id}'
 
 
 def renomear_anexo(instance, filename):

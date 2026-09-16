@@ -57,7 +57,34 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-md-6">{% include "partials/form_field.html" with field=form.tipo_servico %}</div>
+                        </div>
+                        <hr class="my-4">
+                        <h5 class="text-primary mb-3"><i class="bi bi-tags"></i> Serviços realizados</h5>
+                        <p class="text-muted small">Adicione os tipos de serviço realizados nesta OS.</p>
+                        <div id="tipos-servico-formset">
+                            {{ formset_tipos.management_form }}
+                            {% if formset_tipos.non_form_errors %}
+                            <div class="alert alert-danger">{{ formset_tipos.non_form_errors }}</div>
+                            {% endif %}
+                            {% for tipo_form in formset_tipos %}
+                            <div class="tipo-servico-form mb-3 p-3 border rounded">
+                                {% for hidden in tipo_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                {% if tipo_form.DELETE %}<div class="d-none">{{ tipo_form.DELETE }}</div>{% endif %}
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-11">
+                                        <label class="form-label small text-secondary">Tipo de serviço</label>
+                                        {{ tipo_form.tipo_servico }}
+                                        {% if tipo_form.tipo_servico.errors %}<div class="invalid-feedback d-block">{{ tipo_form.tipo_servico.errors }}</div>{% endif %}
+                                    </div>
+                                    <div class="col-md-1">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-tipo" title="Remover"><i class="bi bi-trash"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-4">
+                            <button type="button" id="add-tipo-btn" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-circle"></i> Adicionar serviço</button>
                         </div>
                         {% include "partials/form_field.html" with field=form.descricao %}
 
@@ -288,6 +315,40 @@
 {% endblock %}
 
 {% block extra_js %}
+<script type="template/html" id="tipo-servico-template">
+<div class="tipo-servico-form mb-3 p-3 border rounded">
+    {% for hidden in formset_tipos.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="d-none">{{ formset_tipos.empty_form.DELETE }}</div>
+    <div class="row g-2 align-items-end">
+        <div class="col-md-11"><label class="form-label small text-secondary">Tipo de serviço</label>{{ formset_tipos.empty_form.tipo_servico }}</div>
+        <div class="col-md-1"><button type="button" class="btn btn-outline-danger btn-sm remove-tipo" title="Remover"><i class="bi bi-trash"></i></button></div>
+    </div>
+</div>
+</script>
+<script>
+(function() {
+    const container = document.getElementById('tipos-servico-formset');
+    const totalForms = container.querySelector('[name$="-TOTAL_FORMS"]');
+    document.getElementById('add-tipo-btn').addEventListener('click', function() {
+        const index = Number(totalForms.value);
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = document.getElementById('tipo-servico-template').innerHTML.replace(/__prefix__/g, index);
+        container.appendChild(wrapper.firstElementChild);
+        totalForms.value = index + 1;
+        window.attachInputListeners?.();
+        window.recalcularTotal?.();
+    });
+    container.addEventListener('click', function(e) {
+        const button = e.target.closest('.remove-tipo');
+        if (!button) return;
+        const row = button.closest('.tipo-servico-form');
+        const deletion = row.querySelector('[name$="-DELETE"]');
+        if (deletion) deletion.checked = true;
+        row.style.display = 'none';
+        window.recalcularTotal?.();
+    });
+})();
+</script>
 {% if formset %}
 <script type="template/html" id="gasto-extra-template">
 <div class="gasto-extra-form mb-3 p-3 border rounded position-relative">

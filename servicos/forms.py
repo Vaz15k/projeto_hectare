@@ -1,6 +1,6 @@
 from django import forms
-from django.forms import inlineformset_factory
-from servicos.models import Servico, TipoServico, GastoExtra, AnexoServico, PecaUtilizada
+from django.forms import BaseInlineFormSet, inlineformset_factory
+from servicos.models import Servico, TipoServico, ServicoTipo, GastoExtra, AnexoServico, PecaUtilizada
 from clientes.models import Maquina
 
 
@@ -26,7 +26,7 @@ class ServicoForm(forms.ModelForm):
     class Meta:
         model = Servico
         fields = [
-            "tecnico", "cliente", "tipo_servico", "maquinas",
+            "tecnico", "cliente", "maquinas",
             "descricao", "problema_relatado", "diagnostico", "solucao",
             "data_inicio", "data_conclusao",
             "km_rodado", "valor_km", "hora_trabalhada", "valor_hora",
@@ -35,7 +35,6 @@ class ServicoForm(forms.ModelForm):
         widgets = {
             "tecnico": forms.Select(attrs={"class": "form-control"}),
             "cliente": forms.Select(attrs={"class": "form-control"}),
-            "tipo_servico": forms.Select(attrs={"class": "form-control"}),
             "descricao": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "problema_relatado": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "diagnostico": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
@@ -75,6 +74,44 @@ class ServicoForm(forms.ModelForm):
                 )
 
         return cleaned_data
+
+
+class ServicoTipoForm(forms.ModelForm):
+    class Meta:
+        model = ServicoTipo
+        fields = ["tipo_servico"]
+        widgets = {
+            "tipo_servico": forms.Select(attrs={"class": "form-control tipo-servico-select"}),
+        }
+
+
+class BaseServicoTipoFormSet(BaseInlineFormSet):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.extra = 0
+
+    def clean(self):
+        super().clean()
+        tipos = set()
+        ativos = 0
+        for form in self.forms:
+            if not form.cleaned_data or form.cleaned_data.get("DELETE"):
+                continue
+            tipo = form.cleaned_data.get("tipo_servico")
+            if tipo:
+                ativos += 1
+                if tipo.pk in tipos:
+                    form.add_error("tipo_servico", "Este tipo já foi adicionado à OS.")
+                tipos.add(tipo.pk)
+        if not ativos:
+            raise forms.ValidationError("Adicione ao menos um tipo de serviço à OS.")
+
+
+ServicoTipoFormSet = inlineformset_factory(
+    Servico, ServicoTipo, form=ServicoTipoForm, formset=BaseServicoTipoFormSet,
+    extra=1, can_delete=True,
+)
 
 
 class GastoExtraForm(forms.ModelForm):
