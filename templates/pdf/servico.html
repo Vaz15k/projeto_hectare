@@ -61,6 +61,9 @@
             padding: 5px 10px;
             margin-bottom: 10px;
         }
+        .valores-titulo {
+            -pdf-keep-with-next: true;
+        }
         .campo {
             margin-bottom: 6px;
         }
@@ -88,9 +91,21 @@
             font-weight: bold;
             text-align: left;
         }
-        table td.valor-coluna {
+        table td.valor-coluna, table th.valor-coluna {
             text-align: right;
-            width: 100px;
+        }
+        .tabela-valores {
+            width: 100%;
+        }
+        .tabela-valores .coluna-descricao {
+            width: 72%;
+        }
+        .tabela-valores .valor-coluna {
+            width: 28%;
+        }
+        .tabela-valores .calculo {
+            font-size: 9pt;
+            color: #666;
         }
         .valor-total {
             font-size: 12pt;
@@ -294,42 +309,37 @@
     {% endif %}
 
     <div class="secao">
-        <div class="secao-titulo">Valores</div>
-        <table>
+        <div class="secao-titulo valores-titulo">Valores</div>
+        <table class="tabela-valores" width="100%">
             <thead>
                 <tr>
-                    <th>Descrição</th>
-                    <th>Cálculo</th>
-                    <th class="valor-coluna">Valor</th>
+                    <th class="coluna-descricao" width="72%">Descrição</th>
+                    <th class="valor-coluna" width="28%">Valor</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in servico.itens_servico.all %}
                 <tr>
-                    <td>{{ item.tipo_servico.nome }}</td>
-                    <td>Serviço realizado</td>
+                    <td>{{ item.tipo_servico.nome }}<br><span class="calculo">Serviço realizado</span></td>
                     <td class="valor-coluna">R$ {{ item.valor_aplicado|floatformat:2 }}</td>
                 </tr>
                 {% endfor %}
                 {% if servico.km_rodado and servico.valor_km %}
                 <tr>
-                    <td>Quilometragem</td>
-                    <td>{{ servico.km_rodado }} km x R$ {{ servico.valor_km|floatformat:2 }}</td>
+                    <td>Quilometragem<br><span class="calculo">{{ servico.km_rodado }} km x R$ {{ servico.valor_km|floatformat:2 }}</span></td>
                     <td class="valor-coluna">R$ {{ valor_km_total|floatformat:2 }}</td>
                 </tr>
                 {% endif %}
                 {% if servico.hora_trabalhada and servico.valor_hora %}
                 <tr>
-                    <td>Horas Trabalhadas</td>
-                    <td>{{ servico.hora_trabalhada }}h x R$ {{ servico.valor_hora|floatformat:2 }}</td>
+                    <td>Horas Trabalhadas<br><span class="calculo">{{ servico.hora_trabalhada }}h x R$ {{ servico.valor_hora|floatformat:2 }}</span></td>
                     <td class="valor-coluna">R$ {{ valor_hora_total|floatformat:2 }}</td>
                 </tr>
                 {% endif %}
                 {% if pecas %}
                 {% for peca in pecas %}
                 <tr>
-                    <td>{{ peca.nome }} (x{{ peca.quantidade }})</td>
-                    <td>{{ peca.quantidade }} x R$ {{ peca.valor_unitario|floatformat:2 }}</td>
+                    <td>{{ peca.nome }} (x{{ peca.quantidade }})<br><span class="calculo">{{ peca.quantidade }} x R$ {{ peca.valor_unitario|floatformat:2 }}</span></td>
                     <td class="valor-coluna">R$ {{ peca.valor_total|floatformat:2 }}</td>
                 </tr>
                 {% endfor %}
@@ -337,20 +347,18 @@
                 {% if gastos %}
                 {% for gasto in gastos %}
                 <tr>
-                    <td>{{ gasto.descricao }}</td>
-                    <td>Gasto Extra</td>
+                    <td>{{ gasto.descricao }}<br><span class="calculo">Gasto Extra</span></td>
                     <td class="valor-coluna">R$ {{ gasto.valor|floatformat:2 }}</td>
                 </tr>
                 {% endfor %}
                 {% endif %}
                 {% if desconto_aplicado %}
                 <tr>
-                    <td>Subtotal</td><td></td>
+                    <td>Subtotal</td>
                     <td class="valor-coluna">R$ {{ subtotal|floatformat:2 }}</td>
                 </tr>
                 <tr>
-                    <td>Desconto</td>
-                    <td>{% if servico.tipo_desconto == 'PERCENTUAL' %}{{ servico.desconto|floatformat:2 }}%{% else %}Valor fixo{% endif %}</td>
+                    <td>Desconto<br><span class="calculo">{% if servico.tipo_desconto == 'PERCENTUAL' %}{{ servico.desconto|floatformat:2 }}%{% else %}Valor fixo{% endif %}</span></td>
                     <td class="valor-coluna">- R$ {{ desconto_aplicado|floatformat:2 }}</td>
                 </tr>
                 {% endif %}
