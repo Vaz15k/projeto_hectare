@@ -2,12 +2,12 @@ USUARIO (id_usuario, nome_usuario, email, senha, tipo_usuario, data_criacao, dat
 
 CLIENTE (id_cliente, nome_cliente, documento, telefone, email, endereco, latitude, longitude)
 
-TIPO_SERVICO (id_tipo_servico, nome_servico)
+TIPO_SERVICO (id_tipo_servico, nome_servico, valor_padrao)
 
 SERVICO (id_servico, cliente_id, data_competencia, data_servico, km_rodado, preco_km, preco_total, pecas_utilizadas, descricao_servico, status_servico)
 - cliente_id references CLIENTE(id_cliente)
 
-SERVICO_TIPO (servico_id, tipo_servico_id)
+SERVICO_TIPO (servico_id, tipo_servico_id, valor_aplicado)
 - servico_id references SERVICO(id_servico)
 - tipo_servico_id references TIPO_SERVICO(id_tipo_servico)
 - unico por (servico_id, tipo_servico_id)

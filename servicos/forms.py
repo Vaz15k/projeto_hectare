@@ -7,10 +7,11 @@ from clientes.models import Maquina
 class TipoServicoForm(forms.ModelForm):
     class Meta:
         model = TipoServico
-        fields = ["nome", "descricao"]
+        fields = ["nome", "descricao", "valor_padrao"]
         widgets = {
             "nome": forms.TextInput(attrs={"class": "form-control"}),
             "descricao": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "valor_padrao": forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "0.01"}),
         }
 
 
@@ -79,10 +80,26 @@ class ServicoForm(forms.ModelForm):
 class ServicoTipoForm(forms.ModelForm):
     class Meta:
         model = ServicoTipo
-        fields = ["tipo_servico"]
+        fields = ["tipo_servico", "valor_aplicado"]
         widgets = {
             "tipo_servico": forms.Select(attrs={"class": "form-control tipo-servico-select"}),
+            "valor_aplicado": forms.NumberInput(attrs={
+                "class": "form-control tipo-servico-valor", "min": "0", "step": "0.01",
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["valor_aplicado"].required = False
+        if not self.instance.pk:
+            self.initial["valor_aplicado"] = None
+
+    def clean(self):
+        cleaned = super().clean()
+        if (cleaned.get("tipo_servico") and cleaned.get("valor_aplicado") is None
+                and not cleaned.get("DELETE")):
+            cleaned["valor_aplicado"] = cleaned["tipo_servico"].valor_padrao or 0
+        return cleaned
 
 
 class BaseServicoTipoFormSet(BaseInlineFormSet):

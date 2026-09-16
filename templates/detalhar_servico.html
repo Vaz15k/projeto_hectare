@@ -29,7 +29,7 @@
                         <div class="col-md-6">
                             <label class="form-label small text-secondary fw-bold">Serviços realizados</label>
                             {% for item in servico.itens_servico.all %}
-                            <p class="mb-0">{{ item.tipo_servico.nome }}</p>
+                            <p class="mb-0">{{ item.tipo_servico.nome }} — R$ {{ item.valor_aplicado }}</p>
                             {% endfor %}
                         </div>
                         <div class="col-md-6">

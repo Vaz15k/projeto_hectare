@@ -304,6 +304,13 @@
                 </tr>
             </thead>
             <tbody>
+                {% for item in servico.itens_servico.all %}
+                <tr>
+                    <td>{{ item.tipo_servico.nome }}</td>
+                    <td>Serviço realizado</td>
+                    <td class="valor-coluna">R$ {{ item.valor_aplicado|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
                 {% if servico.km_rodado and servico.valor_km %}
                 <tr>
                     <td>Quilometragem</td>

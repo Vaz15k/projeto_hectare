@@ -211,7 +211,7 @@ def listar_tipos_servico(request):
             "url_criar": "criar_tipo_servico",
             "linhas_partial": "partials/linhas_tipos_servico.html",
             "itens": tipos_servico,
-            "colunas": ["Nome", "Descrição"],
+            "colunas": ["Nome", "Descrição", "Valor padrão"],
         },
     )
 

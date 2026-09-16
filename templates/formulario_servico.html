@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 
 {% block content %}
 <div class="container-fluid p-0">
@@ -60,7 +61,7 @@
                         </div>
                         <hr class="my-4">
                         <h5 class="text-primary mb-3"><i class="bi bi-tags"></i> Serviços realizados</h5>
-                        <p class="text-muted small">Adicione os tipos de serviço realizados nesta OS.</p>
+                        <p class="text-muted small">Adicione os tipos desta OS. O valor padrão é uma sugestão e pode ser ajustado aqui. Estes valores somam às horas, deslocamento, peças e gastos extras.</p>
                         <div id="tipos-servico-formset">
                             {{ formset_tipos.management_form }}
                             {% if formset_tipos.non_form_errors %}
@@ -71,10 +72,15 @@
                                 {% for hidden in tipo_form.hidden_fields %}{{ hidden }}{% endfor %}
                                 {% if tipo_form.DELETE %}<div class="d-none">{{ tipo_form.DELETE }}</div>{% endif %}
                                 <div class="row g-2 align-items-end">
-                                    <div class="col-md-11">
+                                    <div class="col-md-6">
                                         <label class="form-label small text-secondary">Tipo de serviço</label>
                                         {{ tipo_form.tipo_servico }}
                                         {% if tipo_form.tipo_servico.errors %}<div class="invalid-feedback d-block">{{ tipo_form.tipo_servico.errors }}</div>{% endif %}
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label small text-secondary">Valor aplicado (R$)</label>
+                                        {{ tipo_form.valor_aplicado }}
+                                        {% if tipo_form.valor_aplicado.errors %}<div class="invalid-feedback d-block">{{ tipo_form.valor_aplicado.errors }}</div>{% endif %}
                                     </div>
                                     <div class="col-md-1">
                                         <button type="button" class="btn btn-outline-danger btn-sm remove-tipo" title="Remover"><i class="bi bi-trash"></i></button>
@@ -320,7 +326,8 @@
     {% for hidden in formset_tipos.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
     <div class="d-none">{{ formset_tipos.empty_form.DELETE }}</div>
     <div class="row g-2 align-items-end">
-        <div class="col-md-11"><label class="form-label small text-secondary">Tipo de serviço</label>{{ formset_tipos.empty_form.tipo_servico }}</div>
+        <div class="col-md-6"><label class="form-label small text-secondary">Tipo de serviço</label>{{ formset_tipos.empty_form.tipo_servico }}</div>
+        <div class="col-md-5"><label class="form-label small text-secondary">Valor aplicado (R$)</label>{{ formset_tipos.empty_form.valor_aplicado }}</div>
         <div class="col-md-1"><button type="button" class="btn btn-outline-danger btn-sm remove-tipo" title="Remover"><i class="bi bi-trash"></i></button></div>
     </div>
 </div>
@@ -329,6 +336,20 @@
 (function() {
     const container = document.getElementById('tipos-servico-formset');
     const totalForms = container.querySelector('[name$="-TOTAL_FORMS"]');
+    const defaults = Object.fromEntries([
+        {% for tipo in formset_tipos.empty_form.fields.tipo_servico.queryset %}
+        ['{{ tipo.pk }}', '{{ tipo.valor_padrao|default_if_none:""|unlocalize }}'],
+        {% endfor %}
+    ]);
+    container.addEventListener('change', function(e) {
+        if (!e.target.classList.contains('tipo-servico-select')) return;
+        const value = e.target.closest('.tipo-servico-form').querySelector('.tipo-servico-valor');
+        if (value && value.dataset.auto !== 'false') value.value = defaults[e.target.value] || '';
+        window.recalcularTotal?.();
+    });
+    container.addEventListener('input', function(e) {
+        if (e.target.classList.contains('tipo-servico-valor')) e.target.dataset.auto = 'false';
+    });
     document.getElementById('add-tipo-btn').addEventListener('click', function() {
         const index = Number(totalForms.value);
         const wrapper = document.createElement('div');
@@ -409,12 +430,18 @@
             pecasTotal += subtotal;
         });
 
-        const total = subKm + subHora + gastos + pecasTotal;
+        let tiposTotal = 0;
+        document.querySelectorAll('.tipo-servico-form').forEach(function(form) {
+            if (form.style.display === 'none') return;
+            tiposTotal += parseFloat(form.querySelector('.tipo-servico-valor')?.value) || 0;
+        });
+        const total = subKm + subHora + tiposTotal + gastos + pecasTotal;
         document.getElementById('preview-valor-total').textContent = 'R$ ' + total.toFixed(2);
 
         const detalhes = [];
         if (subKm > 0) detalhes.push('km: R$ ' + subKm.toFixed(2));
         if (subHora > 0) detalhes.push('hora: R$ ' + subHora.toFixed(2));
+        if (tiposTotal > 0) detalhes.push('serviços: R$ ' + tiposTotal.toFixed(2));
         if (pecasTotal > 0) detalhes.push('peças: R$ ' + pecasTotal.toFixed(2));
         if (gastos > 0) detalhes.push('extras: R$ ' + gastos.toFixed(2));
         document.getElementById('preview-detalhes').textContent = detalhes.join(' | ');
@@ -433,7 +460,7 @@
     }
 
     window.attachInputListeners = function() {
-        document.querySelectorAll('.gasto-valor, .peca-qtd, .peca-valor, [name$="km_rodado"], [name$="valor_km"], [name$="hora_trabalhada"], [name$="valor_hora"]').forEach(function(el) {
+        document.querySelectorAll('.gasto-valor, .peca-qtd, .peca-valor, .tipo-servico-valor, [name$="km_rodado"], [name$="valor_km"], [name$="hora_trabalhada"], [name$="valor_hora"]').forEach(function(el) {
             el.removeEventListener('input', window.recalcularTotal);
             el.addEventListener('input', window.recalcularTotal);
         });

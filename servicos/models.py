@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from django.db import models
 from django.core.validators import FileExtensionValidator
+from django.core.validators import MinValueValidator
 from django.utils import timezone
 
 from utils.file_utils import validar_tamanho_arquivo
@@ -13,6 +14,12 @@ from funcionarios.models import Empregado
 class TipoServico(models.Model):
     nome = models.CharField(max_length=100)
     descricao = models.TextField(blank=True, null=True)
+    valor_padrao = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Valor padrão (R$)',
+        help_text='Opcional. Usado como sugestão ao adicionar o tipo a uma OS.',
+    )
 
     class Meta:
         db_table = 'core_tiposervico'
@@ -106,6 +113,8 @@ class Servico(models.Model):
             total += self.km_rodado * self.valor_km
         if self.hora_trabalhada and self.valor_hora:
             total += self.hora_trabalhada * self.valor_hora
+        if self.pk:
+            total += sum(item.valor_aplicado for item in self.itens_servico.all())
         return total
 
     def save(self, *args, **kwargs):
@@ -120,6 +129,12 @@ class Servico(models.Model):
 class ServicoTipo(models.Model):
     servico = models.ForeignKey(Servico, on_delete=models.CASCADE, related_name='itens_servico')
     tipo_servico = models.ForeignKey(TipoServico, on_delete=models.PROTECT)
+    valor_aplicado = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Valor do serviço (R$)',
+    )
+
     if TYPE_CHECKING:
         servico_id: int
 
