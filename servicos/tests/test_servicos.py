@@ -402,6 +402,22 @@ class ServicoTests(TestCase):
         self.assertNotIn('laudo.pdf', html_renderizado)
         self.assertNotIn('Não deve aparecer', html_renderizado)
 
+    def test_pdf_mantem_titulo_de_secao_com_inicio_do_conteudo(self):
+        html_renderizado = ''
+
+        def capturar_html(html, **kwargs):
+            nonlocal html_renderizado
+            html_renderizado = html
+
+        with patch('servicos.views.pisa.CreatePDF', side_effect=capturar_html):
+            resposta = self.client.get(self.url('exportar_servico_pdf'))
+
+        self.assertEqual(resposta.status_code, 200)
+        inicio_regra = html_renderizado.index('.secao-titulo {')
+        fim_regra = html_renderizado.index('}', inicio_regra)
+        regra_titulo = html_renderizado[inicio_regra:fim_regra]
+        self.assertIn('-pdf-keep-with-next: true;', regra_titulo)
+
     def test_pix_do_pdf_usa_total_com_desconto(self):
         self.servico.tipo_desconto = 'VALOR'
         self.servico.desconto = Decimal('10.00')
