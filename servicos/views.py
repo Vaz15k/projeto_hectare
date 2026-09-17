@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import tempfile
 import unicodedata
 from datetime import datetime
 from decimal import Decimal
@@ -14,6 +15,7 @@ from django.template.loader import render_to_string
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 
+from PIL import Image, ImageOps
 from xhtml2pdf import pisa
 
 from servicos.models import Servico, TipoServico, GastoExtra, PecaUtilizada
@@ -584,8 +586,6 @@ def _gerar_payload_pix(chave_pix, nome_beneficiario, cidade, valor, txid='***'):
 def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
     import qrcode
     from qrcode.constants import ERROR_CORRECT_H
-    import tempfile
-
     payload = _gerar_payload_pix(chave_pix, nome_empresa, cidade, valor, txid)
 
     qr = qrcode.QRCode(
@@ -608,16 +608,56 @@ def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
         return arquivo.name
 
 
+def _gerar_miniatura_evidencia(anexo, tamanho=(800, 600)):
+    """Cria um quadro 4:3 sem cortar nem deformar a foto original."""
+    with anexo.arquivo.open('rb') as arquivo:
+        with Image.open(arquivo) as original:
+            imagem = ImageOps.exif_transpose(original)
+            tem_transparencia = (
+                imagem.mode in ('RGBA', 'LA') or 'transparency' in imagem.info
+            )
+            if tem_transparencia:
+                imagem_rgba = imagem.convert('RGBA')
+                fundo = Image.new('RGBA', imagem_rgba.size, 'white')
+                fundo.alpha_composite(imagem_rgba)
+                imagem = fundo.convert('RGB')
+            else:
+                imagem = imagem.convert('RGB')
+
+            miniatura = ImageOps.contain(
+                imagem, tamanho, method=Image.Resampling.LANCZOS
+            )
+
+    quadro = Image.new('RGB', tamanho, 'white')
+    posicao = (
+        (tamanho[0] - miniatura.width) // 2,
+        (tamanho[1] - miniatura.height) // 2,
+    )
+    quadro.paste(miniatura, posicao)
+
+    with tempfile.NamedTemporaryFile(
+        prefix='evidencia_', suffix='.jpg', delete=False
+    ) as arquivo:
+        caminho = arquivo.name
+        try:
+            quadro.save(arquivo, 'JPEG', quality=90, optimize=True)
+        except Exception:
+            os.remove(caminho)
+            raise
+    return caminho
+
+
 @login_required
 def exportar_servico_pdf(request, pk):
     servico = get_object_or_404(
         Servico.objects.select_related('cliente', 'tecnico')
-        .prefetch_related('maquinas', 'itens_servico__tipo_servico'),
+        .prefetch_related('maquinas', 'itens_servico__tipo_servico', 'anexos'),
         pk=pk
     )
     gastos = servico.gastos_extras.all()
     pecas = servico.pecas.all()
     maquinas = servico.maquinas.all()
+    fotos = [anexo for anexo in servico.anexos.all() if anexo.is_image()]
     config = Configuracao.load()
 
     valor_km_total = Decimal('0.00')
@@ -635,29 +675,40 @@ def exportar_servico_pdf(request, pk):
     if config.logo:
         logo_url = config.logo.url
 
-    qrcode_path = None
-    if config.chave_pix:
-        cidade = config.endereco.split(',')[-1].strip() if config.endereco else '***'
-        qrcode_path = _gerar_qrcode_pix(
-            _normalizar_chave_pix(config.chave_pix, config.tipo_chave_pix),
-            config.nome_empresa or '***',
-            cidade,
-            servico.valor_total,
-            txid=f'OS{servico.pk:04d}'
-        )
-
     response = HttpResponse(content_type='application/pdf')
     filename = f"OS_{servico.cliente.nome.replace(' ', '_')}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
-    # O QR fica num arquivo temporário só para o xhtml2pdf conseguir lê-lo, e
-    # precisa sumir mesmo se a renderização estourar no meio.
+    qrcode_path = None
+    arquivos_temporarios = []
     try:
+        if config.chave_pix:
+            cidade = config.endereco.split(',')[-1].strip() if config.endereco else '***'
+            qrcode_path = _gerar_qrcode_pix(
+                _normalizar_chave_pix(config.chave_pix, config.tipo_chave_pix),
+                config.nome_empresa or '***',
+                cidade,
+                servico.valor_total,
+                txid=f'OS{servico.pk:04d}'
+            )
+            arquivos_temporarios.append(qrcode_path)
+
+        fotos_pdf = []
+        for foto in fotos:
+            caminho = _gerar_miniatura_evidencia(foto)
+            arquivos_temporarios.append(caminho)
+            fotos_pdf.append({'caminho': caminho, 'descricao': foto.descricao})
+        fotos_linhas = [
+            fotos_pdf[indice:indice + 2]
+            for indice in range(0, len(fotos_pdf), 2)
+        ]
+
         html_string = render_to_string('pdf/servico.html', {
             'servico': servico,
             'gastos': gastos,
             'pecas': pecas,
             'maquinas': maquinas,
+            'fotos_linhas': fotos_linhas,
             'config': config,
             'valor_km_total': valor_km_total,
             'valor_hora_total': valor_hora_total,
@@ -672,7 +723,8 @@ def exportar_servico_pdf(request, pk):
 
         pisa.CreatePDF(html_string, dest=response, link_callback=_link_callback)
     finally:
-        if qrcode_path and os.path.exists(qrcode_path):
-            os.remove(qrcode_path)
+        for caminho in arquivos_temporarios:
+            if os.path.exists(caminho):
+                os.remove(caminho)
 
     return response
