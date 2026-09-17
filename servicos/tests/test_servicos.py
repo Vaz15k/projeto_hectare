@@ -1,13 +1,16 @@
 import os
+import io
 from datetime import datetime
 from datetime import timezone as dt_timezone
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
 from clientes.models import Cliente, Maquina
 from core.models import Configuracao
@@ -31,6 +34,7 @@ from servicos.models import (
 from servicos.views import (
     _build_filtro_ctx,
     _gerar_qrcode_pix,
+    _gerar_miniatura_evidencia,
     _salvar_servico_com_relacionamentos,
 )
 
@@ -341,6 +345,78 @@ class ServicoTests(TestCase):
                     for caminho in caminhos:
                         if os.path.exists(caminho):
                             os.remove(caminho)
+
+    def test_miniatura_de_evidencia_tem_tamanho_fixo_sem_deformar(self):
+        origem = io.BytesIO()
+        Image.new('RGB', (200, 400), '#123456').save(origem, 'PNG')
+        anexo = SimpleNamespace(
+            arquivo=SimpleNamespace(open=lambda modo: io.BytesIO(origem.getvalue()))
+        )
+
+        caminho = _gerar_miniatura_evidencia(anexo)
+        try:
+            with Image.open(caminho) as miniatura:
+                self.assertEqual(miniatura.size, (800, 600))
+                self.assertGreater(sum(miniatura.getpixel((400, 300))), 0)
+                self.assertGreater(sum(miniatura.getpixel((10, 10))), 700)
+        finally:
+            os.remove(caminho)
+
+    def test_pdf_inclui_apenas_fotos_em_grade_de_duas_colunas(self):
+        for indice in range(4):
+            AnexoServico.objects.create(
+                servico=self.servico,
+                arquivo=f'anexos/foto-{indice}.jpg',
+                descricao=f'Evidência {indice}',
+            )
+        AnexoServico.objects.create(
+            servico=self.servico,
+            arquivo='anexos/laudo.pdf',
+            descricao='Não deve aparecer nas evidências fotográficas',
+        )
+        html_renderizado = ''
+
+        def capturar_html(html, **kwargs):
+            nonlocal html_renderizado
+            html_renderizado = html
+
+        with (
+            patch(
+                'servicos.views._gerar_miniatura_evidencia',
+                side_effect=lambda foto: f'/tmp/evidencia-{foto.pk}.jpg',
+            ) as gerar_miniatura,
+            patch('servicos.views.pisa.CreatePDF', side_effect=capturar_html),
+        ):
+            resposta = self.client.get(self.url('exportar_servico_pdf'))
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(gerar_miniatura.call_count, 4)
+        self.assertIn('Evidências Fotográficas', html_renderizado)
+        self.assertEqual(html_renderizado.count('class="evidencia-foto"'), 4)
+        self.assertEqual(html_renderizado.count('<tr>'), html_renderizado.count('</tr>'))
+        self.assertLess(
+            html_renderizado.index('Evidências Fotográficas'),
+            html_renderizado.index('>Valores</div>'),
+        )
+        self.assertIn('Evidência 3', html_renderizado)
+        self.assertNotIn('laudo.pdf', html_renderizado)
+        self.assertNotIn('Não deve aparecer', html_renderizado)
+
+    def test_pdf_mantem_titulo_de_secao_com_inicio_do_conteudo(self):
+        html_renderizado = ''
+
+        def capturar_html(html, **kwargs):
+            nonlocal html_renderizado
+            html_renderizado = html
+
+        with patch('servicos.views.pisa.CreatePDF', side_effect=capturar_html):
+            resposta = self.client.get(self.url('exportar_servico_pdf'))
+
+        self.assertEqual(resposta.status_code, 200)
+        inicio_regra = html_renderizado.index('.secao-titulo {')
+        fim_regra = html_renderizado.index('}', inicio_regra)
+        regra_titulo = html_renderizado[inicio_regra:fim_regra]
+        self.assertIn('-pdf-keep-with-next: true;', regra_titulo)
 
     def test_pix_do_pdf_usa_total_com_desconto(self):
         self.servico.tipo_desconto = 'VALOR'
