@@ -343,6 +343,17 @@
                 </tr>
                 {% endfor %}
                 {% endif %}
+                {% if desconto_aplicado %}
+                <tr>
+                    <td>Subtotal</td><td></td>
+                    <td class="valor-coluna">R$ {{ subtotal|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td>Desconto</td>
+                    <td>{% if servico.tipo_desconto == 'PERCENTUAL' %}{{ servico.desconto|floatformat:2 }}%{% else %}Valor fixo{% endif %}</td>
+                    <td class="valor-coluna">- R$ {{ desconto_aplicado|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
             </tbody>
         </table>
         <div class="valor-total">

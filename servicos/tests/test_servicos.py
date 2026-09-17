@@ -95,6 +95,43 @@ class ServicoTests(TestCase):
         self.assertEqual(servico.gastos_extras.get().valor, Decimal('15.50'))
         self.assertEqual(list(servico.tipos_servico.all()), [self.tipo])
 
+    def test_desconto_percentual_e_fixo_incluem_todos_os_itens(self):
+        dados = dict(self.formularios()[0].data)
+        dados.update({'tipo_desconto': 'PERCENTUAL', 'desconto': '10'})
+        resposta = self.client.post(reverse('criar_servico'), dados)
+        self.assertRedirects(resposta, reverse('home'))
+        criado = Servico.objects.latest('pk')
+        self.assertEqual(criado.valor_total, Decimal('249.66'))
+        self.assertEqual(criado.calcular_desconto(Decimal('277.40')), Decimal('27.74'))
+        self.assertContains(self.client.get(self.url('detalhar_servico', criado.pk)), '249,66')
+
+        itens = criado.itens_servico.get()
+        gasto = criado.gastos_extras.get()
+        peca = criado.pecas.get()
+        dados.update({
+            'tipo_desconto': 'VALOR', 'desconto': '30.00',
+            'itens_servico-INITIAL_FORMS': '1', 'itens_servico-0-id': itens.pk,
+            'gastos_extras-INITIAL_FORMS': '1', 'gastos_extras-0-id': gasto.pk,
+            'pecas-INITIAL_FORMS': '1', 'pecas-0-id': peca.pk,
+        })
+        self.assertRedirects(self.client.post(self.url('editar_servico', criado.pk), dados),
+                             reverse('listar_servicos'))
+        criado.refresh_from_db()
+        self.assertEqual(criado.valor_total, Decimal('247.40'))
+        self.assertEqual(criado.tipo_desconto, 'VALOR')
+
+    def test_descontos_invalidos_sao_rejeitados_sem_criar_os(self):
+        base = dict(self.formularios()[0].data)
+        for tipo, valor in [('PERCENTUAL', '101'), ('VALOR', '278'),
+                            ('VALOR', '-1'), ('NENHUM', '10')]:
+            with self.subTest(tipo=tipo, valor=valor):
+                resposta = self.client.post(reverse('criar_servico'), {
+                    **base, 'tipo_desconto': tipo, 'desconto': valor,
+                })
+                self.assertEqual(resposta.status_code, 200)
+                self.assertIn('desconto', resposta.context['form'].errors)
+                self.assertEqual(Servico.objects.count(), 1)
+
     def test_cria_os_com_dois_tipos_valores_padrao_e_ajuste(self):
         self.tipo.valor_padrao = Decimal('40.00')
         self.tipo.save()
@@ -304,6 +341,19 @@ class ServicoTests(TestCase):
                     for caminho in caminhos:
                         if os.path.exists(caminho):
                             os.remove(caminho)
+
+    def test_pix_do_pdf_usa_total_com_desconto(self):
+        self.servico.tipo_desconto = 'VALOR'
+        self.servico.desconto = Decimal('10.00')
+        self.servico.save()
+        config = Configuracao.load()
+        config.chave_pix = 'teste@example.org'
+        config.tipo_chave_pix = 'email'
+        config.save()
+        with patch('servicos.views._gerar_qrcode_pix', wraps=_gerar_qrcode_pix) as gerar:
+            resposta = self.client.get(self.url('exportar_servico_pdf'))
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(gerar.call_args.args[3], Decimal('215.00'))
 
     def test_pdf_remove_qrcode_quando_renderizacao_falha(self):
         Configuracao.objects.create(chave_pix='teste@example.org')

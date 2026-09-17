@@ -142,6 +142,16 @@
                             <p class="mb-0 font-monospace">{{ servico.hora_trabalhada|default:"0" }}h / R$ {{ servico.valor_hora|default:"0.00" }}</p>
                         </div>
                         {% endif %}
+                        {% if desconto_aplicado %}
+                        <div class="col-md-4">
+                            <label class="form-label small text-secondary fw-bold">Subtotal</label>
+                            <p class="mb-0 font-monospace">R$ {{ subtotal|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-secondary fw-bold">Desconto{% if servico.tipo_desconto == 'PERCENTUAL' %} ({{ servico.desconto|floatformat:2 }}%){% endif %}</label>
+                            <p class="mb-0 font-monospace">- R$ {{ desconto_aplicado|floatformat:2 }}</p>
+                        </div>
+                        {% endif %}
                         <div class="col-md-4">
                             <label class="form-label small text-secondary fw-bold">Valor Total</label>
                             <p class="mb-0 font-monospace fs-5 fw-bold text-success">R$ {{ servico.valor_total|default:"0.00" }}</p>
