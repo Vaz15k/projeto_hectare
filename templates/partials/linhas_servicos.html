@@ -1,7 +1,7 @@
 {% for servico in itens %}
 <tr>
     <td class="px-4 py-3 text-muted">#{{ servico.pk }}</td>
-    <td class="px-4 py-3 fw-bold">{{ servico.tipo_servico.nome }}</td>
+    <td class="px-4 py-3 fw-bold">{% for item in servico.itens_servico.all %}{{ item.tipo_servico.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
     <td class="px-4 py-3">{{ servico.cliente.nome }}</td>
     <td class="px-4 py-3 small">{{ servico.tecnico.nome }}</td>
     <td class="px-4 py-3">

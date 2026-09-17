@@ -19,7 +19,7 @@ from xhtml2pdf import pisa
 from servicos.models import Servico, TipoServico, GastoExtra, PecaUtilizada
 from servicos.forms import (
     ServicoForm, TipoServicoForm,
-    GastoExtraFormSet, AnexoServicoFormSet, PecaUtilizadaFormSet,
+    GastoExtraFormSet, AnexoServicoFormSet, PecaUtilizadaFormSet, ServicoTipoFormSet,
 )
 from clientes.models import Cliente, Maquina
 from core.models import Configuracao
@@ -64,7 +64,7 @@ def _build_filtro_ctx(request):
                 pass
         if tipo_servico_id:
             try:
-                qs = qs.filter(tipo_servico_id=int(tipo_servico_id))
+                qs = qs.filter(tipos_servico__pk=int(tipo_servico_id))
             except (ValueError, TypeError):
                 pass
         if status and not excluir_status:
@@ -154,12 +154,12 @@ def home(request):
     month_values = [revenue_by_month.get((m.year, m.month), 0) for m in months]
 
     ultimos_servicos = base.select_related(
-        'cliente', 'tecnico', 'tipo_servico'
-    ).order_by('-data_criacao')[:5]
+        'cliente', 'tecnico'
+    ).prefetch_related('itens_servico__tipo_servico').order_by('-data_criacao')[:5]
 
     proximos_agendamentos = base.filter(
         status='AGENDADO', data_inicio__gte=hoje,
-    ).select_related('cliente', 'tecnico', 'tipo_servico').order_by('data_inicio')[:5]
+    ).select_related('cliente', 'tecnico').prefetch_related('itens_servico__tipo_servico').order_by('data_inicio')[:5]
 
     return render(request, 'dashboard.html', {
         **filtro_ctx,
@@ -211,7 +211,7 @@ def listar_tipos_servico(request):
             "url_criar": "criar_tipo_servico",
             "linhas_partial": "partials/linhas_tipos_servico.html",
             "itens": tipos_servico,
-            "colunas": ["Nome", "Descrição"],
+            "colunas": ["Nome", "Descrição", "Valor padrão"],
         },
     )
 
@@ -248,10 +248,12 @@ def _salvar_servico_com_relacionamentos(
     formset,
     formset_pecas,
     formset_anexos,
+    formset_tipos,
 ):
     """Salva o serviço e seus relacionamentos em uma única transação."""
     with transaction.atomic():
         servico = form.save()
+        formset_tipos.save()
         formset.save()
         formset_pecas.save()
         formset_anexos.save()
@@ -270,7 +272,7 @@ def listar_servicos(request):
 
     filtro_ctx, aplicar_filtro = _build_filtro_ctx(request)
     servicos = aplicar_filtro(
-        Servico.objects.select_related('cliente', 'tecnico', 'tipo_servico')
+        Servico.objects.select_related('cliente', 'tecnico').prefetch_related('itens_servico__tipo_servico')
     ).order_by('-data_inicio')
 
     paginator = Paginator(servicos, 20)
@@ -285,7 +287,7 @@ def listar_servicos(request):
             'url_criar': 'criar_servico',
             'linhas_partial': 'partials/linhas_servicos.html',
             'itens': page_obj,
-            'colunas': ['#', 'Tipo', 'Cliente', 'Técnico', 'Status', 'Início', 'Total'],
+            'colunas': ['#', 'Tipos', 'Cliente', 'Técnico', 'Status', 'Início', 'Total'],
             'mostrar_filtros': True,
         },
     )
@@ -302,12 +304,14 @@ def criar_servico(request):
             request.FILES,
             instance=form.instance,
         )
+        formset_tipos = ServicoTipoFormSet(request.POST, instance=form.instance)
 
         form_is_valid = form.is_valid()
         formsets_are_valid = all([
             formset.is_valid(),
             formset_pecas.is_valid(),
             formset_anexos.is_valid(),
+            formset_tipos.is_valid(),
         ])
         if form_is_valid and formsets_are_valid:
             _salvar_servico_com_relacionamentos(
@@ -315,6 +319,7 @@ def criar_servico(request):
                 formset,
                 formset_pecas,
                 formset_anexos,
+                formset_tipos,
             )
             return redirect("home")
     else:
@@ -322,6 +327,7 @@ def criar_servico(request):
         formset = GastoExtraFormSet()
         formset_pecas = PecaUtilizadaFormSet()
         formset_anexos = AnexoServicoFormSet()
+        formset_tipos = ServicoTipoFormSet()
 
     if request.method == "POST":
         maquinas_selecionadas = set(int(pk) for pk in request.POST.getlist("maquinas") if pk)
@@ -337,6 +343,7 @@ def criar_servico(request):
             "formset": formset,
             "formset_pecas": formset_pecas,
             "formset_anexos": formset_anexos,
+            "formset_tipos": formset_tipos,
             "maquinas_selecionadas": maquinas_selecionadas,
             "titulo": "Novo Serviço",
             "rota_cancelar": "listar_servicos",
@@ -353,12 +360,14 @@ def editar_servico(request, pk):
         formset = GastoExtraFormSet(request.POST, instance=servico)
         formset_pecas = PecaUtilizadaFormSet(request.POST, instance=servico)
         formset_anexos = AnexoServicoFormSet(request.POST, request.FILES, instance=servico)
+        formset_tipos = ServicoTipoFormSet(request.POST, instance=servico)
 
         form_is_valid = form.is_valid()
         formsets_are_valid = all([
             formset.is_valid(),
             formset_pecas.is_valid(),
             formset_anexos.is_valid(),
+            formset_tipos.is_valid(),
         ])
         if form_is_valid and formsets_are_valid:
             _salvar_servico_com_relacionamentos(
@@ -366,6 +375,7 @@ def editar_servico(request, pk):
                 formset,
                 formset_pecas,
                 formset_anexos,
+                formset_tipos,
             )
             return redirect("listar_servicos")
     else:
@@ -373,6 +383,7 @@ def editar_servico(request, pk):
         formset = GastoExtraFormSet(instance=servico)
         formset_pecas = PecaUtilizadaFormSet(instance=servico)
         formset_anexos = AnexoServicoFormSet(instance=servico)
+        formset_tipos = ServicoTipoFormSet(instance=servico)
 
     if request.method == "POST":
         maquinas_selecionadas = set(int(pk) for pk in request.POST.getlist("maquinas") if pk)
@@ -386,6 +397,7 @@ def editar_servico(request, pk):
             "formset": formset,
             "formset_pecas": formset_pecas,
             "formset_anexos": formset_anexos,
+            "formset_tipos": formset_tipos,
             "maquinas_selecionadas": maquinas_selecionadas,
             "titulo": f"Editar Serviço #{servico.pk}",
             "rota_cancelar": "listar_servicos",
@@ -415,7 +427,9 @@ def deletar_servico(request, pk):
 
 @login_required
 def detalhar_servico(request, pk):
-    servico = get_object_or_404(Servico, pk=pk)
+    servico = get_object_or_404(
+        Servico.objects.prefetch_related('itens_servico__tipo_servico'), pk=pk
+    )
     gastos = servico.gastos_extras.all()
     pecas = servico.pecas.all()
     anexos = servico.anexos.all()
@@ -533,13 +547,14 @@ def _gerar_payload_pix(chave_pix, nome_beneficiario, cidade, valor, txid='***'):
 
 def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
     import qrcode
+    from qrcode.constants import ERROR_CORRECT_H
     import tempfile
 
     payload = _gerar_payload_pix(chave_pix, nome_empresa, cidade, valor, txid)
 
     qr = qrcode.QRCode(
         version=None,
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        error_correction=ERROR_CORRECT_H,
         box_size=20,
         border=2,
     )
@@ -560,8 +575,8 @@ def _gerar_qrcode_pix(chave_pix, nome_empresa, cidade, valor, txid='***'):
 @login_required
 def exportar_servico_pdf(request, pk):
     servico = get_object_or_404(
-        Servico.objects.select_related('cliente', 'tecnico', 'tipo_servico')
-        .prefetch_related('maquinas'),
+        Servico.objects.select_related('cliente', 'tecnico')
+        .prefetch_related('maquinas', 'itens_servico__tipo_servico'),
         pk=pk
     )
     gastos = servico.gastos_extras.all()

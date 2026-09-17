@@ -17,12 +17,14 @@ from servicos.forms import (
     GastoExtraFormSet,
     PecaUtilizadaFormSet,
     ServicoForm,
+    ServicoTipoFormSet,
 )
 from servicos.models import (
     AnexoServico,
     GastoExtra,
     PecaUtilizada,
     Servico,
+    ServicoTipo,
     TipoServico,
     calcular_data_competencia,
 )
@@ -42,11 +44,12 @@ class ServicoTests(TestCase):
         cls.tipo = TipoServico.objects.create(nome='Manutencao')
         cls.maquina = Maquina.objects.create(cliente=cls.cliente, nome='Trator')
         cls.servico = Servico.objects.create(
-            cliente=cls.cliente, tecnico=cls.tecnico, tipo_servico=cls.tipo,
+            cliente=cls.cliente, tecnico=cls.tecnico,
             data_inicio=datetime(2026, 1, 31, 23, tzinfo=timezone.get_current_timezone()),
             km_rodado=Decimal(10), valor_km=Decimal('2.50'),
             hora_trabalhada=Decimal(2), valor_hora=Decimal(100),
         )
+        ServicoTipo.objects.create(servico=cls.servico, tipo_servico=cls.tipo)
 
     def setUp(self):
         self.client.force_login(self.usuario)
@@ -57,7 +60,7 @@ class ServicoTests(TestCase):
     def formularios(self):
         dados = {
             'cliente': self.cliente.pk, 'tecnico': self.tecnico.pk,
-            'tipo_servico': self.tipo.pk, 'status': 'ORCAMENTO',
+            'status': 'ORCAMENTO',
             'maquinas': [self.maquina.pk], 'km_rodado': '10', 'valor_km': '2.50',
             'hora_trabalhada': '2', 'valor_hora': '100',
             'gastos_extras-TOTAL_FORMS': '1', 'gastos_extras-INITIAL_FORMS': '0',
@@ -65,10 +68,12 @@ class ServicoTests(TestCase):
             'pecas-TOTAL_FORMS': '1', 'pecas-INITIAL_FORMS': '0',
             'pecas-0-nome': 'Filtro', 'pecas-0-quantidade': '3', 'pecas-0-valor_unitario': '12.30',
             'anexos-TOTAL_FORMS': '0', 'anexos-INITIAL_FORMS': '0',
+            'itens_servico-TOTAL_FORMS': '1', 'itens_servico-INITIAL_FORMS': '0',
+            'itens_servico-0-tipo_servico': self.tipo.pk,
         }
         form = ServicoForm(dados)
         forms = [form] + [classe(dados, instance=form.instance) for classe in
-                          (GastoExtraFormSet, PecaUtilizadaFormSet, AnexoServicoFormSet)]
+                          (GastoExtraFormSet, PecaUtilizadaFormSet, AnexoServicoFormSet, ServicoTipoFormSet)]
         for formulario in forms:
             self.assertTrue(formulario.is_valid(), formulario.errors)
         return forms
@@ -88,9 +93,83 @@ class ServicoTests(TestCase):
         self.assertEqual(list(servico.maquinas.all()), [self.maquina])
         self.assertEqual(servico.pecas.get().valor_total, Decimal('36.90'))
         self.assertEqual(servico.gastos_extras.get().valor, Decimal('15.50'))
+        self.assertEqual(list(servico.tipos_servico.all()), [self.tipo])
+
+    def test_cria_os_com_dois_tipos_valores_padrao_e_ajuste(self):
+        self.tipo.valor_padrao = Decimal('40.00')
+        self.tipo.save()
+        segundo = TipoServico.objects.create(nome='Revisao', valor_padrao=Decimal('60.00'))
+        tela_criacao = self.client.get(reverse('criar_servico'))
+        self.assertContains(tela_criacao, "['%s', '40.00']" % self.tipo.pk)
+        self.assertEqual(tela_criacao.context['formset_tipos'].total_form_count(), 1)
+        dados = {
+            'cliente': self.cliente.pk, 'tecnico': self.tecnico.pk, 'status': 'ORCAMENTO',
+            'itens_servico-TOTAL_FORMS': '2', 'itens_servico-INITIAL_FORMS': '0',
+            'itens_servico-0-tipo_servico': self.tipo.pk,
+            'itens_servico-1-tipo_servico': segundo.pk,
+            'itens_servico-1-valor_aplicado': '55.00',
+            'gastos_extras-TOTAL_FORMS': '0', 'gastos_extras-INITIAL_FORMS': '0',
+            'pecas-TOTAL_FORMS': '0', 'pecas-INITIAL_FORMS': '0',
+            'anexos-TOTAL_FORMS': '0', 'anexos-INITIAL_FORMS': '0',
+        }
+        response = self.client.post(reverse('criar_servico'), dados)
+        self.assertRedirects(response, reverse('home'))
+        criado = Servico.objects.latest('pk')
+        tela_edicao = self.client.get(self.url('editar_servico', criado.pk))
+        self.assertContains(tela_edicao, 'Revisao')
+        self.assertEqual(tela_edicao.context['formset_tipos'].total_form_count(), 2)
+        self.assertEqual(criado.valor_total, Decimal('95.00'))
+        self.assertEqual(list(criado.itens_servico.order_by('pk').values_list('valor_aplicado', flat=True)),
+                         [Decimal('40.00'), Decimal('55.00')])
+        self.assertContains(self.client.get(self.url('detalhar_servico', criado.pk)), 'Revisao')
+        self.assertContains(self.client.get(reverse('listar_servicos')), 'Manutencao, Revisao')
+
+        filtro = _build_filtro_ctx(RequestFactory().get('/', {'tipo_servico': segundo.pk}))[1]
+        self.assertIn(criado, filtro(Servico.objects.all()))
+
+        itens = list(criado.itens_servico.order_by('pk'))
+        edicao = dados.copy()
+        edicao.update({
+            'itens_servico-INITIAL_FORMS': '2',
+            'itens_servico-0-id': itens[0].pk,
+            'itens_servico-0-valor_aplicado': '40.00',
+            'itens_servico-1-id': itens[1].pk,
+            'itens_servico-1-valor_aplicado': '50.00',
+        })
+        self.assertRedirects(self.client.post(self.url('editar_servico', criado.pk), edicao),
+                             reverse('listar_servicos'))
+        criado.refresh_from_db()
+        self.assertEqual(criado.valor_total, Decimal('90.00'))
+
+        segundo.valor_padrao = Decimal('80.00')
+        segundo.save()
+        criado.refresh_from_db()
+        self.assertEqual(criado.valor_total, Decimal('90.00'))
+        self.assertEqual(criado.itens_servico.get(tipo_servico=segundo).valor_aplicado, Decimal('50.00'))
+
+    def test_edicao_nao_mostra_linha_vazia_antes_de_adicionar(self):
+        response = self.client.get(self.url('editar_servico'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['formset_tipos'].total_form_count(), 1)
+        self.assertEqual(len(response.context['formset_tipos'].forms), 1)
+
+    def test_tipos_duplicados_ou_ausentes_sao_rejeitados(self):
+        base = {
+            'itens_servico-TOTAL_FORMS': '2', 'itens_servico-INITIAL_FORMS': '0',
+            'itens_servico-0-tipo_servico': self.tipo.pk,
+            'itens_servico-1-tipo_servico': self.tipo.pk,
+        }
+        duplicado = ServicoTipoFormSet(base, instance=Servico())
+        self.assertFalse(duplicado.is_valid())
+        self.assertIn('duplicados', str(duplicado.errors))
+        vazio = ServicoTipoFormSet({
+            'itens_servico-TOTAL_FORMS': '1', 'itens_servico-INITIAL_FORMS': '0',
+        }, instance=Servico())
+        self.assertFalse(vazio.is_valid())
+        self.assertIn('Adicione ao menos um tipo', str(vazio.non_form_errors()))
 
     def test_falha_em_cada_etapa_reverte_servico_e_relacionamentos(self):
-        for etapa in (1, 2, 3):
+        for etapa in (1, 2, 3, 4):
             with self.subTest(etapa=etapa):
                 forms = self.formularios()
                 with (
@@ -102,6 +181,7 @@ class ServicoTests(TestCase):
                 self.assertFalse(GastoExtra.objects.exists())
                 self.assertFalse(PecaUtilizada.objects.exists())
                 self.assertFalse(Servico.maquinas.through.objects.exists())
+                self.assertEqual(ServicoTipo.objects.count(), 1)
 
     def test_falha_ao_editar_restaura_valores_e_gastos_excluidos(self):
         gasto = GastoExtra.objects.create(servico=self.servico, descricao='Frete', valor=10)
@@ -111,9 +191,11 @@ class ServicoTests(TestCase):
         dados['gastos_extras-INITIAL_FORMS'] = '1'
         dados['gastos_extras-0-id'] = gasto.pk
         dados['gastos_extras-0-DELETE'] = 'on'
+        dados['itens_servico-INITIAL_FORMS'] = '1'
+        dados['itens_servico-0-id'] = self.servico.itens_servico.get().pk
         form = ServicoForm(dados, instance=self.servico)
         forms = [form] + [classe(dados, instance=form.instance) for classe in
-                          (GastoExtraFormSet, PecaUtilizadaFormSet, AnexoServicoFormSet)]
+                          (GastoExtraFormSet, PecaUtilizadaFormSet, AnexoServicoFormSet, ServicoTipoFormSet)]
         for formulario in forms:
             self.assertTrue(formulario.is_valid(), formulario.errors)
         with (
@@ -131,7 +213,7 @@ class ServicoTests(TestCase):
     def test_maquina_de_outro_cliente_rejeitada(self):
         outro = Cliente.objects.create(nome='Outro')
         form = ServicoForm({'cliente': outro.pk, 'tecnico': self.tecnico.pk,
-                            'tipo_servico': self.tipo.pk, 'status': 'ORCAMENTO', 'maquinas': [self.maquina.pk]})
+                            'status': 'ORCAMENTO', 'maquinas': [self.maquina.pk]})
         self.assertFalse(form.is_valid())
         self.assertIn('maquinas', form.errors)
 
@@ -181,8 +263,9 @@ class ServicoTests(TestCase):
         self.assertTrue(Servico.objects.filter(pk=self.servico.pk).exists())
 
     def test_filtros_combinados_e_exclusoes(self):
-        outro = Servico.objects.create(cliente=self.cliente, tecnico=self.tecnico, tipo_servico=self.tipo,
+        outro = Servico.objects.create(cliente=self.cliente, tecnico=self.tecnico,
                                        status='CONCLUIDO', data_inicio=datetime(2026, 2, 2, tzinfo=timezone.get_current_timezone()))
+        ServicoTipo.objects.create(servico=outro, tipo_servico=self.tipo)
         request = RequestFactory().get('/', {'mes': '2026-01', 'status': 'ORCAMENTO', 'tipo_servico': self.tipo.pk, 'page': 2})
         ctx, aplicar = _build_filtro_ctx(request)
         self.assertTrue(ctx['tem_filtros'])
