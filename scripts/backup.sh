@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+umask 077
 
 # Diretório onde o script está.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,7 +12,7 @@ PROJECT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 BACKUP_ROOT="$PROJECT_DIR/backups"
 
 DATE="$(date +"%Y-%m-%d_%H-%M-%S")"
-BACKUP_DIR="$BACKUP_ROOT/$DATE"
+ARCHIVE_PATH="$BACKUP_ROOT/$DATE.tar.gz"
 
 cd "$PROJECT_DIR"
 
@@ -21,14 +22,24 @@ if [[ ! -f "docker-compose.yaml" ]]; then
     exit 1
 fi
 
-mkdir -p "$BACKUP_DIR"
+mkdir -p "$BACKUP_ROOT"
+
+if [[ -e "$ARCHIVE_PATH" ]]; then
+    echo "ERRO: backup já existe: $ARCHIVE_PATH" >&2
+    exit 1
+fi
+
+BACKUP_DIR="$(mktemp -d "$BACKUP_ROOT/.backup-$DATE.XXXXXX")"
+ARCHIVE_TMP=""
+trap 'rm -rf -- "$BACKUP_DIR"; rm -f -- "$ARCHIVE_TMP"' EXIT
+ARCHIVE_TMP="$(mktemp "$BACKUP_ROOT/.archive-$DATE.XXXXXX")"
 
 echo "========================================"
 echo " Project Hectare - Backup"
 echo "========================================"
 echo
 echo "Projeto : $PROJECT_DIR"
-echo "Destino : $BACKUP_DIR"
+echo "Destino : $ARCHIVE_PATH"
 echo
 
 echo "[1/4] Backup do PostgreSQL..."
@@ -71,11 +82,16 @@ chmod 600 "$BACKUP_DIR/.env"
     fi
 } > "$BACKUP_DIR/metadata.txt"
 
+echo "Compactando backup..."
+tar -czf "$ARCHIVE_TMP" -C "$BACKUP_DIR" .
+ln -- "$ARCHIVE_TMP" "$ARCHIVE_PATH"
+rm -f -- "$ARCHIVE_TMP"
+
 echo
 echo "========================================"
 echo " Backup concluído"
 echo "========================================"
 echo
 
-du -sh "$BACKUP_DIR"
-ls -lah "$BACKUP_DIR"
+du -sh "$ARCHIVE_PATH"
+ls -lah "$ARCHIVE_PATH"

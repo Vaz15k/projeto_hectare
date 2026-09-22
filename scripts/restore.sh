@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -20,33 +21,44 @@ fi
 # ---------------------------------------------------------
 
 if [[ $# -gt 0 ]]; then
-    BACKUP_DIR="$1"
+    BACKUP_SOURCE="$1"
 
-    if [[ "$BACKUP_DIR" != /* ]]; then
-        BACKUP_DIR="$PROJECT_DIR/$BACKUP_DIR"
+    if [[ "$BACKUP_SOURCE" != /* ]]; then
+        BACKUP_SOURCE="$PROJECT_DIR/$BACKUP_SOURCE"
     fi
 else
-    BACKUP_DIR="$(
+    if [[ ! -d "$BACKUP_ROOT" ]]; then
+        echo "ERRO: nenhum backup encontrado."
+        exit 1
+    fi
+
+    BACKUP_SOURCE="$(
         find "$BACKUP_ROOT" \
             -mindepth 1 \
             -maxdepth 1 \
-            -type d \
+            -type f \
+            -name '????-??-??_??-??-??.tar.gz' \
             | sort \
             | tail -n 1
     )"
 fi
 
-if [[ -z "${BACKUP_DIR:-}" || ! -d "$BACKUP_DIR" ]]; then
+if [[ -z "${BACKUP_SOURCE:-}" || ! -f "$BACKUP_SOURCE" ]]; then
     echo "ERRO: backup não encontrado."
     exit 1
 fi
+
+BACKUP_DIR="$(mktemp -d)"
+trap 'rm -rf -- "$BACKUP_DIR"' EXIT
+echo "Extraindo backup: $BACKUP_SOURCE"
+tar -xzf "$BACKUP_SOURCE" -C "$BACKUP_DIR"
 
 echo "========================================"
 echo " Project Hectare - Restore"
 echo "========================================"
 echo
 echo "Projeto : $PROJECT_DIR"
-echo "Backup  : $BACKUP_DIR"
+echo "Backup  : $BACKUP_SOURCE"
 echo
 
 if [[ ! -s "$BACKUP_DIR/database.dump" ]]; then
